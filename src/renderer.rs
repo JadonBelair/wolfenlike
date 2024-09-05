@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
-use image::{DynamicImage, GenericImageView};
+use image::{math::Rect, DynamicImage, GenericImageView};
 use pixels::{Pixels, SurfaceTexture};
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -59,10 +59,7 @@ impl Renderer {
             .frame_buffer
             .frame_mut()
             .chunks_exact_mut(4)
-            .skip(
-                (x.clamp(0, self.width - 1)
-                    + self.width * top_y.clamp(0, self.height)) as usize,
-            )
+            .skip((x.clamp(0, self.width - 1) + self.width * top_y.clamp(0, self.height)) as usize)
             .step_by(self.width as usize)
             .take(actual_height as usize)
         {
@@ -82,7 +79,7 @@ impl Renderer {
     /// draws a colored pixel at the given x,y coordinates
     pub fn draw_pixel(&mut self, color: &[u8; 4], x: i32, y: i32) {
         if x < 0 || x > self.width || y < 0 || y >= self.height {
-            return
+            return;
         }
 
         let offset = ((y * self.width as i32 + x) * 4) as usize;
@@ -116,6 +113,36 @@ impl Renderer {
                 }
                 let pix =
                     texture.get_pixel((c_x as f32 * x_scale) as u32, (c_y as f32 * y_scale) as u32);
+                self.draw_pixel(&pix.0, offset_x, offset_y);
+            }
+        }
+    }
+
+    pub fn draw_sub_texture(
+        &mut self,
+        texture: &DynamicImage,
+        x: i32,
+        y: i32,
+        size: PhysicalSize<u32>,
+        sub_image: Rect,
+    ) {
+        let subimage = texture.view(sub_image.x, sub_image.y, sub_image.width, sub_image.height);
+
+        let x_scale = subimage.width() as f32 / size.width as f32;
+        let y_scale = subimage.height() as f32 / size.height as f32;
+        for c_y in 0..size.height {
+            let offset_y = c_y as i32 + y;
+
+            for c_x in 0..size.width {
+                let offset_x = c_x as i32 + x;
+
+                if (offset_x < 0 || offset_x >= self.width as i32)
+                    || (offset_y < 0 || offset_y >= self.height as i32)
+                {
+                    continue;
+                }
+                let pix = subimage
+                    .get_pixel((c_x as f32 * x_scale) as u32, (c_y as f32 * y_scale) as u32);
                 self.draw_pixel(&pix.0, offset_x, offset_y);
             }
         }

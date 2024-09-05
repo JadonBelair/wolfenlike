@@ -1,4 +1,5 @@
 use anyhow::Result;
+use image::math::Rect;
 use image::open;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{Event, VirtualKeyCode};
@@ -49,6 +50,7 @@ fn main() -> Result<()> {
             world.renderer.draw_texture(&bricks, 42, 10, PhysicalSize::new(64, 64));
             world.renderer.draw_texture(&bricks, 74, 10, PhysicalSize::new(64, 64));
             world.renderer.draw_texture(&bricks, 106, 10, PhysicalSize::new(64, 64));
+            world.renderer.draw_sub_texture(&bricks, 10, 94, PhysicalSize::new(10, 64), Rect { x: 0, y: 0, width: 1, height: 64 });
             if let Err(_) = world.render() {
                 control_flow.set_exit();
                 return;
