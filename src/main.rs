@@ -1,27 +1,31 @@
-use image::{open, DynamicImage};
-use winit::dpi::{LogicalSize, PhysicalSize};
-use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use winit::event_loop::EventLoop;
-use winit::window::WindowBuilder;
 use anyhow::Result;
+use image::open;
+use winit::dpi::{LogicalSize, PhysicalSize};
+use winit::event::{Event, VirtualKeyCode};
+use winit::event_loop::EventLoop;
+use winit::window::{Fullscreen, WindowBuilder};
 
-use crate::renderer::Renderer;
+use input::InputManager;
+use renderer::Renderer;
 
-const WIDTH: u32 = 320;
-const HEIGHT: u32 = 180;
+const WIDTH: i32 = 320;
+const HEIGHT: i32 = 180;
 
+mod input;
 mod renderer;
 
 /// Representation of the application state. In this example, a box will bounce around the screen.
 struct App {
     renderer: Renderer,
-    offset: usize,
+    player_x: f32,
+    player_y: f32,
+    player_angle: i32,
 }
 
 fn main() -> Result<()> {
     let event_loop = EventLoop::new();
     let window = {
-        let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
+        let size = LogicalSize::new(1280.0, 720.0);
         WindowBuilder::new()
             .with_title("Hello Pixels")
             .with_inner_size(size)
@@ -32,37 +36,62 @@ fn main() -> Result<()> {
 
     let renderer = Renderer::new(&window, WIDTH, HEIGHT)?;
     let mut world = App::new(renderer);
+    let mut input_helper = InputManager::new();
 
-    let bricks = open("./images/Brick1a.png")?;
+    let bricks = open("./images/Brick4a.png")?;
 
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_poll();
 
-        match event {
-            Event::RedrawRequested(_) => {
-                world.draw(&bricks);
-                if let Err(_) = world.render() {
-                    control_flow.set_exit();
-                    return;
-                }
-            }
-            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
+        if let Event::RedrawRequested(_) = event {
+            world.draw();
+            world.renderer.draw_texture(&bricks, 10, 10, PhysicalSize::new(64, 64));
+            world.renderer.draw_texture(&bricks, 42, 10, PhysicalSize::new(64, 64));
+            world.renderer.draw_texture(&bricks, 74, 10, PhysicalSize::new(64, 64));
+            world.renderer.draw_texture(&bricks, 106, 10, PhysicalSize::new(64, 64));
+            if let Err(_) = world.render() {
                 control_flow.set_exit();
+                return;
             }
-            Event::WindowEvent { event: WindowEvent::KeyboardInput { input: KeyboardInput { state: ElementState::Pressed, virtual_keycode: Some(keycode), ..}, ..}, ..} => {
-                match keycode {
-                    VirtualKeyCode::Escape | VirtualKeyCode::Q => control_flow.set_exit(),
-                    _ => ()
-                }
-            }
-            Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
+        }
+
+        // main loop logic
+        if input_helper.process_event(&event) {
+            println!("{:?}", input_helper.elapsed().unwrap());
+            if let Some(size) = input_helper.request_resize {
                 world.renderer.resize(size);
             }
-            Event::MainEventsCleared => {
-                world.update();
-                window.request_redraw();
+
+            if input_helper.is_just_pressed(VirtualKeyCode::F) {
+                if window.fullscreen().is_some() {
+                    window.set_fullscreen(None);
+                } else {
+                    window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+                }
             }
-            _ => ()
+
+            if input_helper.is_just_pressed(VirtualKeyCode::Q) || input_helper.request_exit {
+                control_flow.set_exit();
+            }
+
+            let delta = input_helper.elapsed().unwrap();
+            let speed = 5000.0 * delta.as_secs_f32();
+
+            if input_helper.is_down(VirtualKeyCode::A) {
+                world.player_x -= speed;
+            }
+            if input_helper.is_down(VirtualKeyCode::D) {
+                world.player_x += speed;
+            }
+            if input_helper.is_down(VirtualKeyCode::W) {
+                world.player_y -= speed;
+            }
+            if input_helper.is_down(VirtualKeyCode::S) {
+                world.player_y += speed;
+            }
+
+            world.update();
+            window.request_redraw();
         }
     });
 }
@@ -71,16 +100,15 @@ impl App {
     /// Create a new `World` instance that can draw a moving box.
     fn new(renderer: Renderer) -> Self {
         Self {
-            offset: 1,
+            player_x: 0.0,
+            player_y: 0.0,
+            player_angle: 0,
             renderer,
         }
     }
 
     /// Update the `World` internal state; bounce the box around the screen.
-    fn update(&mut self) {
-        self.offset += 1;
-        self.offset %= WIDTH as usize;
-    }
+    fn update(&mut self) {}
 
     fn render(&self) -> Result<()> {
         self.renderer.render()
@@ -89,10 +117,17 @@ impl App {
     /// Draw the `World` state to the frame buffer.
     ///
     /// Assumes the default texture format: `wgpu::TextureFormat::Rgba8UnormSrgb`
-    fn draw(&mut self, bricks: &DynamicImage) {
+    fn draw(&mut self) {
         self.renderer.fill(&[0xff, 0xff, 0xff, 0xff]);
         self.renderer.draw_pixel(&[0, 0, 0xff, 0xff], 0, 0);
-        self.renderer.draw_texture(bricks, 10, 10, PhysicalSize::new(100, 100));
-        self.renderer.draw_vert_line(&[(self.offset % 256) as u8, 75, 75, 0xff], self.offset, 10, 160);
+        self.renderer
+            .draw_rectangle(&[0x00, 0xff, 0xff, 0xff], 10, 116, 64, 64);
+        self.renderer.draw_rectangle(
+            &[0xff, 0x00, 0xff, 0xff],
+            self.player_x as i32,
+            self.player_y as i32,
+            20,
+            20,
+        );
     }
 }
