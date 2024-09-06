@@ -36,9 +36,7 @@ impl Renderer {
 
     /// fills the frame with the given color
     pub fn fill(&mut self, color: &[u8; 4]) {
-        for pixel in self.frame_buffer.frame_mut().chunks_exact_mut(4) {
-            pixel.copy_from_slice(color);
-        }
+        self.frame_buffer.frame_mut().copy_from_slice(&color.repeat((self.width * self.height) as usize));
     }
 
     /// draws a vertical line starting at the given x and top y with the given height
