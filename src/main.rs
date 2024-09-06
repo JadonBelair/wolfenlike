@@ -22,6 +22,7 @@ struct App {
     player_x: f32,
     player_y: f32,
     player_angle: f32,
+    map: Vec<Vec<u32>>,
 }
 
 fn main() -> Result<()> {
@@ -75,11 +76,23 @@ impl App {
     /// Create a new `World` instance that can draw a moving box.
     fn new(renderer: Renderer, input_manager: InputManager) -> Self {
         Self {
-            player_x: 0.0,
-            player_y: 0.0,
+            player_x: 1.0,
+            player_y: 1.0,
             player_angle: 0.0,
             renderer,
             input_manager,
+            map: vec![
+                vec![1,1,1,1,1,1,1,1,1,1],
+                vec![1,0,0,0,0,0,0,0,0,1],
+                vec![1,0,0,0,0,0,0,0,0,1],
+                vec![1,0,0,0,0,0,0,0,0,1],
+                vec![1,0,0,0,0,0,0,0,0,1],
+                vec![1,0,0,0,0,0,0,0,0,1],
+                vec![1,0,0,0,0,0,0,0,0,1],
+                vec![1,0,0,0,0,0,0,0,0,1],
+                vec![1,0,0,0,0,0,0,0,0,1],
+                vec![1,1,1,1,1,1,1,1,1,1],
+            ],
         }
     }
 
@@ -90,56 +103,34 @@ impl App {
         }
 
 
-        let delta = self.input_manager.elapsed().unwrap();
-        let speed = 5000.0 * delta.as_secs_f32();
+        let delta = self.input_manager.elapsed().unwrap().as_secs_f32();
+        let speed = 1000.0 * delta;
 
         if self.input_manager.is_down(VirtualKeyCode::A) {
-            self.player_angle += 10000.0 * delta.as_secs_f32();
-            if self.player_angle < 0.0 {
-                self.player_angle += 360.0;
-            }
-            if self.player_angle > 360.0 {
-                self.player_angle -= 360.0;
-            }
+            self.player_angle += 1.5 * delta;
         }
         if self.input_manager.is_down(VirtualKeyCode::D) {
-            self.player_angle -= 10000.0 * delta.as_secs_f32();
-            if self.player_angle < 0.0 {
-                self.player_angle += 360.0;
-            }
-            if self.player_angle > 360.0 {
-                self.player_angle -= 360.0;
-            }
+            self.player_angle -= 1.5 * delta;
         }
         if self.input_manager.is_down(VirtualKeyCode::W) {
-            let mut delta_y = (speed * self.player_angle.to_radians().sin()).abs();
-            let mut delta_x = (speed.powi(2) - delta_y.powi(2)).sqrt();
-
-            if self.player_angle >= 0.0 && self.player_angle <= 180.0 {
-                delta_y *= -1.0;
+            let delta_x = self.player_angle.sin() * speed * delta;
+            let delta_y = self.player_angle.cos() * speed * delta;
+            if self.map[self.player_y as usize][(self.player_x + delta_x) as usize] == 0 {
+                self.player_x += delta_x;
             }
-
-            if self.player_angle > 90.0 && self.player_angle <= 270.0 {
-                delta_x *= -1.0
+            if self.map[(self.player_y + delta_y) as usize][self.player_x as usize] == 0 {
+                self.player_y += delta_y;
             }
-
-            self.player_y += delta_y;
-            self.player_x += delta_x;
         }
         if self.input_manager.is_down(VirtualKeyCode::S) {
-            let mut delta_y = (speed * self.player_angle.to_radians().sin()).abs();
-            let mut delta_x = (speed.powi(2) - delta_y.powi(2)).sqrt();
-
-            if self.player_angle >= 0.0 && self.player_angle <= 180.0 {
-                delta_y *= -1.0;
+            let delta_x = self.player_angle.sin() * speed * delta;
+            let delta_y = self.player_angle.cos() * speed * delta;
+            if self.map[self.player_y as usize][(self.player_x - delta_x) as usize] == 0 {
+                self.player_x -= delta_x;
             }
-
-            if self.player_angle > 90.0 && self.player_angle <= 270.0 {
-                delta_x *= -1.0
+            if self.map[(self.player_y - delta_y) as usize][self.player_x as usize] == 0 {
+                self.player_y -= delta_y;
             }
-
-            self.player_y -= delta_y;
-            self.player_x -= delta_x;
         }
     }
 
@@ -151,20 +142,19 @@ impl App {
     fn draw(&mut self) {
         self.renderer.fill(&[0, 0, 0, 0xff]);
 
+        for (y, row) in self.map.iter().enumerate() {
+            for (x, cell) in row.iter().enumerate() {
+                if *cell != 0 {
+                    self.renderer.draw_rectangle(&[0xff, 0xff, 0xff, 0xff], x as i32 * 10, y as i32 * 10, 9, 9);
+                }
+            }
+        }
+
         let speed = 15.0;
-        let mut end_y= (speed * self.player_angle.to_radians().sin()).abs();
-        let mut end_x = (speed.powi(2) - end_y.powi(2)).sqrt();
+        let end_x = self.player_angle.sin() * speed;
+        let end_y = self.player_angle.cos() * speed;
 
-        if self.player_angle >= 0.0 && self.player_angle <= 180.0 {
-            end_y *= -1.0;
-        }
-
-        if self.player_angle > 90.0 && self.player_angle <= 270.0 {
-            end_x *= -1.0
-        }
-
-        self.renderer.draw_line(&[0x00, 0xff, 0x00, 0xff], self.player_x as i32 + 3, self.player_y as i32 + 3, self.player_x as i32 + 3 + end_x as i32, self.player_y as i32 + 3 + end_y as i32);
-
-        self.renderer.draw_rectangle(&[0x00, 0xff, 0x00, 0xff], self.player_x as i32, self.player_y as i32, 6, 6);
+        self.renderer.draw_line(&[0x00, 0xff, 0x00, 0xff], (self.player_x * 10.0) as i32, (self.player_y  * 10.0) as i32, (self.player_x * 10.0) as i32 + end_x as i32, (self.player_y * 10.0) as i32 + end_y as i32);
+        self.renderer.draw_rectangle(&[0x00, 0xff, 0x00, 0xff], (self.player_x * 10.0) as i32 - 2, (self.player_y * 10.0) as i32 - 2, 5, 5);
     }
 }
