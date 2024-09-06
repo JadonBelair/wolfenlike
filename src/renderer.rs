@@ -43,12 +43,12 @@ impl Renderer {
 
     /// draws a vertical line starting at the given x and top y with the given height
     pub fn draw_vert_line(&mut self, color: &[u8; 4], x: i32, top_y: i32, height: i32) -> i32 {
-        if x < 0 || x >= self.width as i32 {
+        if x < 0 || x >= self.width || top_y >= self.height || top_y + height < 0 {
             return -1;
         }
 
-        let actual_height = if top_y + height > self.height as i32 {
-            self.height as i32 - top_y
+        let actual_height = if top_y + height > self.height {
+            self.height - top_y
         } else if top_y < 0 {
             (top_y + height).max(0)
         } else {
@@ -67,6 +67,124 @@ impl Renderer {
         }
 
         actual_height
+    }
+
+    /// draws a horizontal line starting at the given left x and y with the given width
+    pub fn draw_hori_line(&mut self, color: &[u8; 4], left_x: i32, y: i32, width: i32) -> i32 {
+        if y < 0 || y >= self.height || left_x >= self.width || left_x + width < 0 {
+            return -1;
+        }
+
+        let actual_width = if left_x + width > self.width {
+            self.width - left_x
+        } else if left_x < 0 {
+            (left_x + width).max(0)
+        } else {
+            width
+        };
+
+        for pixel in self
+            .frame_buffer
+            .frame_mut()
+            .chunks_exact_mut(4)
+            .skip((left_x.clamp(0, self.width - 1) + self.width * y.clamp(0, self.height)) as usize)
+            .take(actual_width as usize)
+        {
+            pixel.copy_from_slice(color);
+        }
+
+        actual_width
+    }
+
+    /// draw a colored line between 2 given x,y points
+    pub fn draw_line(&mut self, color: &[u8; 4], x1: i32, y1: i32, x2: i32, y2: i32) {
+        if (x1 < 0 && x2 < 0)
+            || (x1 >= self.width && x2 >= self.width)
+            || (y1 < 0 && y2 < 0)
+            || (y1 >= self.height && y2 >= self.height)
+        {
+            return;
+        }
+
+        if (y2 - y1).abs() < (x2 - x1).abs() {
+            if x1 > x2 {
+                self.draw_line_low(color, x2, y2, x1, y1);
+            } else {
+                self.draw_line_low(color, x1, y1, x2, y2);
+            }
+        } else {
+            if y1 > y2 {
+                self.draw_line_high(color, x2, y2, x1, y1);
+            } else {
+                self.draw_line_high(color, x1, y1, x2, y2);
+            }
+        }
+    }
+
+    fn draw_line_high(&mut self, color: &[u8; 4], x1: i32, y1: i32, x2: i32, y2: i32) {
+        let frame = self.frame_buffer.frame_mut();
+
+        let mut dx = x2 - x1;
+        let dy = y2 - y1;
+        let mut xi = 1;
+
+        if dx < 0 {
+            xi = -1;
+            dx = -dx;
+        }
+
+        let mut d = (2 * dx) - dy;
+        let mut x = x1;
+
+        for y in y1..=y2 {
+            if x >= 0 && x < self.width && y >= 0 && y < self.height {
+                let offset = ((y * self.width + x) * 4) as usize;
+                frame[offset + 0] = color[0];
+                frame[offset + 1] = color[1];
+                frame[offset + 2] = color[2];
+                frame[offset + 3] = color[3];
+            }
+
+            if d > 0 {
+                x += xi;
+                d += 2 * (dx - dy);
+            } else {
+                d += 2 * dx;
+            }
+        }
+    }
+
+    fn draw_line_low(&mut self, color: &[u8; 4], x1: i32, y1: i32, x2: i32, y2: i32) {
+        let frame = self.frame_buffer.frame_mut();
+
+        let dx = x2 - x1;
+        let mut dy = y2 - y1;
+        let mut yi = 1;
+
+        if dy < 0 {
+            yi = -1;
+            dy = -dy;
+        }
+
+        let mut d = (2 * dy) - dx;
+        let mut y = y1;
+
+        for x in x1..=x2 {
+            if x >= 0 && x < self.width && y >= 0 && y < self.height {
+                let offset = ((y * self.width + x) * 4) as usize;
+                frame[offset + 0] = color[0];
+                frame[offset + 1] = color[1];
+                frame[offset + 2] = color[2];
+                frame[offset + 3] = color[3];
+            }
+
+            if d > 0 {
+                y += yi;
+                d += 2 * (dy - dx);
+            } else {
+                d += 2 * dy;
+            }
+        }
     }
 
     /// draws a colored rectangle at the specified x,y coords with the given size
