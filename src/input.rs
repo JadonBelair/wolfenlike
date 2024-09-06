@@ -34,7 +34,7 @@ impl InputManager {
                 self.just_pressed.clear();
                 self.released.clear();
 
-                self.start_time = Some(Instant::now());
+                self.start_time.get_or_insert(Instant::now());
                 self.delta_time = None;
                 false
             }
