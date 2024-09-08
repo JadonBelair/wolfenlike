@@ -3,7 +3,7 @@
 use std::time::{Duration, Instant};
 use winit::{
     dpi::PhysicalSize,
-    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{DeviceEvent, ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
 };
 
 #[derive(Default)]
@@ -13,6 +13,7 @@ pub struct InputManager {
     released: Vec<VirtualKeyCode>,
     pub request_exit: bool,
     pub request_resize: Option<PhysicalSize<u32>>,
+    mouse_motion: (f64, f64),
     start_time: Option<Instant>,
     delta_time: Option<Duration>,
 }
@@ -33,6 +34,8 @@ impl InputManager {
                 self.request_exit = false;
                 self.just_pressed.clear();
                 self.released.clear();
+
+                self.mouse_motion = (0.0, 0.0);
 
                 self.start_time.get_or_insert(Instant::now());
                 self.delta_time = None;
@@ -69,6 +72,15 @@ impl InputManager {
                     self.just_pressed.push(*keycode);
                     self.held.push(*keycode);
                 }
+                false
+            }
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion {
+                    delta
+                },
+                ..
+            } => {
+                self.mouse_motion = *delta;
                 false
             }
             Event::WindowEvent {
@@ -123,5 +135,9 @@ impl InputManager {
     /// time between start of last 2 frames
     pub fn elapsed(&self) -> Option<Duration> {
         self.delta_time
+    }
+
+    pub fn mouse_motion(&self) -> (f64, f64) {
+        self.mouse_motion
     }
 }
