@@ -222,14 +222,24 @@ impl Renderer {
         for c_y in ((clamped_y as i32 - y) as u32)..size.height {
             let offset_y = c_y as i32 + y;
 
+            if offset_y < 0 {
+                continue;
+            }
+            if offset_y >= self.height {
+                break;
+            }
+
             for c_x in((clamped_x as i32 - x) as u32)..size.width {
                 let offset_x = c_x as i32 + x;
 
-                if (offset_x < 0 || offset_x >= self.width as i32)
-                    || (offset_y < 0 || offset_y >= self.height as i32)
-                {
+                if offset_x < 0 {
                     continue;
                 }
+
+                if offset_x >= self.width as i32 {
+                    break;
+                }
+
                 let pix =
                     texture.get_pixel((c_x as f32 * x_scale) as u32, (c_y as f32 * y_scale) as u32);
                 self.draw_pixel(&pix.0, offset_x, offset_y);
