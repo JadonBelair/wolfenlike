@@ -123,6 +123,7 @@ impl App {
             let (motion_x, _) = self.input_manager.mouse_motion();
             -motion_x as f32 * delta * 2.0
         };
+        let old_dir_x = self.dir_x;
         self.dir_x = self.dir_x * (turn_speed).cos() - self.dir_y * (turn_speed).sin();
         self.dir_y = old_dir_x * (turn_speed).sin() + self.dir_y * (turn_speed).cos();
         let old_plane_x = self.plane_x;
@@ -130,6 +131,7 @@ impl App {
         self.plane_y = old_plane_x * (turn_speed).sin() + self.plane_y * (turn_speed).cos();
 
         let move_speed = 5.0 * delta;
+
         if self.input_manager.is_down(VirtualKeyCode::W) {
             if self.map[self.player_y as usize][(self.player_x + self.dir_x * move_speed) as usize] == 0
             {
@@ -148,6 +150,26 @@ impl App {
             if self.map[(self.player_y - self.dir_y * move_speed) as usize][self.player_x as usize] == 0
             {
                 self.player_y -= self.dir_y * move_speed;
+            }
+        }
+        if self.input_manager.is_down(VirtualKeyCode::A) {
+            if self.map[(self.player_y + self.dir_x * move_speed) as usize][self.player_x as usize] == 0
+            {
+                self.player_y += self.dir_x * move_speed;
+            }
+            if self.map[self.player_y as usize][(self.player_x - self.dir_y * move_speed) as usize] == 0
+            {
+                self.player_x -= self.dir_y * move_speed;
+            }
+        }
+        if self.input_manager.is_down(VirtualKeyCode::D) {
+            if self.map[(self.player_y - self.dir_x * move_speed) as usize][self.player_x as usize] == 0
+            {
+                self.player_y -= self.dir_x * move_speed;
+            }
+            if self.map[self.player_y as usize][(self.player_x + self.dir_y * move_speed) as usize] == 0
+            {
+                self.player_x += self.dir_y * move_speed;
             }
         }
     }
@@ -197,7 +219,7 @@ impl App {
                     side = 1;
                 }
 
-                if self.map[map_y as usize][map_x as usize] > 0 {
+                if map_y < 0 || map_y >= self.map.len() as i32 || map_x < 0 || map_x >= self.map[0].len() as i32 || self.map[map_y as usize][map_x as usize] > 0 {
                     hit = 1;
                 }
             }
