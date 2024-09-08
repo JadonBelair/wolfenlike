@@ -42,6 +42,9 @@ fn main() -> Result<()> {
             .unwrap()
     };
 
+    window.set_cursor_grab(winit::window::CursorGrabMode::Confined).unwrap();
+    window.set_cursor_visible(false);
+
     let renderer = Renderer::new(&window, WIDTH, HEIGHT)?;
     let input_manager = InputManager::new();
     let mut world = App::new(renderer, input_manager);
@@ -115,43 +118,36 @@ impl App {
         }
 
         let delta = self.input_manager.elapsed().unwrap().as_secs_f32();
-        let speed = 5.0 * delta;
 
-        if self.input_manager.is_down(VirtualKeyCode::A) {
-            let old_dir_x = self.dir_x;
-            self.dir_x = self.dir_x * (1.5 * delta).cos() - self.dir_y * (1.5 * delta).sin();
-            self.dir_y = old_dir_x * (1.5 * delta).sin() + self.dir_y * (1.5 * delta).cos();
-            let old_plane_x = self.plane_x;
-            self.plane_x = self.plane_x * (1.5 * delta).cos() - self.plane_y * (1.5 * delta).sin();
-            self.plane_y = old_plane_x * (1.5 * delta).sin() + self.plane_y * (1.5 * delta).cos();
-        }
-        if self.input_manager.is_down(VirtualKeyCode::D) {
-            let old_dir_x = self.dir_x;
-            self.dir_x = self.dir_x * (-1.5 * delta).cos() - self.dir_y * (-1.5 * delta).sin();
-            self.dir_y = old_dir_x * (-1.5 * delta).sin() + self.dir_y * (-1.5 * delta).cos();
-            let old_plane_x = self.plane_x;
-            self.plane_x =
-                self.plane_x * (-1.5 * delta).cos() - self.plane_y * (-1.5 * delta).sin();
-            self.plane_y = old_plane_x * (-1.5 * delta).sin() + self.plane_y * (-1.5 * delta).cos();
-        }
+        let turn_speed = {
+            let (motion_x, _) = self.input_manager.mouse_motion();
+            -motion_x as f32 * delta * 2.0
+        };
+        self.dir_x = self.dir_x * (turn_speed).cos() - self.dir_y * (turn_speed).sin();
+        self.dir_y = old_dir_x * (turn_speed).sin() + self.dir_y * (turn_speed).cos();
+        let old_plane_x = self.plane_x;
+        self.plane_x = self.plane_x * (turn_speed).cos() - self.plane_y * (turn_speed).sin();
+        self.plane_y = old_plane_x * (turn_speed).sin() + self.plane_y * (turn_speed).cos();
+
+        let move_speed = 5.0 * delta;
         if self.input_manager.is_down(VirtualKeyCode::W) {
-            if self.map[self.player_y as usize][(self.player_x + self.dir_x * speed) as usize] == 0
+            if self.map[self.player_y as usize][(self.player_x + self.dir_x * move_speed) as usize] == 0
             {
-                self.player_x += self.dir_x * speed;
+                self.player_x += self.dir_x * move_speed;
             }
-            if self.map[(self.player_y + self.dir_y * speed) as usize][self.player_x as usize] == 0
+            if self.map[(self.player_y + self.dir_y * move_speed) as usize][self.player_x as usize] == 0
             {
-                self.player_y += self.dir_y * speed;
+                self.player_y += self.dir_y * move_speed;
             }
         }
         if self.input_manager.is_down(VirtualKeyCode::S) {
-            if self.map[self.player_y as usize][(self.player_x - self.dir_x * speed) as usize] == 0
+            if self.map[self.player_y as usize][(self.player_x - self.dir_x * move_speed) as usize] == 0
             {
-                self.player_x -= self.dir_x * speed;
+                self.player_x -= self.dir_x * move_speed;
             }
-            if self.map[(self.player_y - self.dir_y * speed) as usize][self.player_x as usize] == 0
+            if self.map[(self.player_y - self.dir_y * move_speed) as usize][self.player_x as usize] == 0
             {
-                self.player_y -= self.dir_y * speed;
+                self.player_y -= self.dir_y * move_speed;
             }
         }
     }
