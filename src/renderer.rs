@@ -214,12 +214,15 @@ impl Renderer {
         y: i32,
         size: PhysicalSize<u32>,
     ) {
+        let clamped_y = y.clamp(0, self.height) as u32;
+        let clamped_x = x.clamp(0, self.width) as u32;
+
         let x_scale = texture.width() as f32 / size.width as f32;
         let y_scale = texture.height() as f32 / size.height as f32;
-        for c_y in 0..size.height {
+        for c_y in ((clamped_y as i32 - y) as u32)..size.height {
             let offset_y = c_y as i32 + y;
 
-            for c_x in 0..size.width {
+            for c_x in((clamped_x as i32 - x) as u32)..size.width {
                 let offset_x = c_x as i32 + x;
 
                 if (offset_x < 0 || offset_x >= self.width as i32)
@@ -237,6 +240,7 @@ impl Renderer {
     pub fn draw_sub_texture(
         &mut self,
         texture: &DynamicImage,
+        color: &[u8; 4],
         x: i32,
         y: i32,
         size: PhysicalSize<u32>,
@@ -244,22 +248,41 @@ impl Renderer {
     ) {
         let subimage = texture.view(sub_image.x, sub_image.y, sub_image.width, sub_image.height);
 
+        let clamped_y = y.clamp(0, self.height) as u32;
+        let clamped_x = x.clamp(0, self.width) as u32;
+
         let x_scale = subimage.width() as f32 / size.width as f32;
         let y_scale = subimage.height() as f32 / size.height as f32;
-        for c_y in 0..size.height {
+        for c_y in ((clamped_y as i32 - y) as u32)..size.height {
             let offset_y = c_y as i32 + y;
 
-            for c_x in 0..size.width {
+            if offset_y < 0 {
+                continue;
+            }
+            if offset_y >= self.height {
+                break;
+            }
+
+            for c_x in ((clamped_x as i32 - x) as u32)..size.width {
                 let offset_x = c_x as i32 + x;
 
-                if (offset_x < 0 || offset_x >= self.width as i32)
-                    || (offset_y < 0 || offset_y >= self.height as i32)
-                {
+                if offset_x < 0 {
                     continue;
                 }
+
+                if offset_x >= self.width as i32 {
+                    break;
+                }
+
                 let pix = subimage
-                    .get_pixel((c_x as f32 * x_scale) as u32, (c_y as f32 * y_scale) as u32);
-                self.draw_pixel(&pix.0, offset_x, offset_y);
+                    .get_pixel((c_x as f32 * x_scale) as u32, (c_y as f32 * y_scale) as u32).0;
+                let color = [
+                    (pix[0] as f32  * (color[0] as f32 / 255.0)) as u8,
+                    (pix[1] as f32  * (color[1] as f32 / 255.0)) as u8,
+                    (pix[2] as f32  * (color[2] as f32 / 255.0)) as u8,
+                    (pix[3] as f32  * (color[3] as f32 / 255.0)) as u8,
+                ];
+                self.draw_pixel(&color, offset_x, offset_y);
             }
         }
     }
