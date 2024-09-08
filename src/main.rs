@@ -11,8 +11,8 @@ use winit::window::{Fullscreen, WindowBuilder};
 use input::InputManager;
 use renderer::Renderer;
 
-const WIDTH: i32 = 320;
-const HEIGHT: i32 = 180;
+const WIDTH: i32 = 360;
+const HEIGHT: i32 = 270;
 
 mod input;
 mod renderer;
