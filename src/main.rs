@@ -69,7 +69,9 @@ fn main() -> Result<()> {
                 }
             }
 
-            if world.input_manager.is_just_pressed(VirtualKeyCode::Q) || world.input_manager.request_exit {
+            if world.input_manager.is_just_pressed(VirtualKeyCode::Q)
+                || world.input_manager.request_exit
+            {
                 control_flow.set_exit();
             }
 
@@ -92,16 +94,16 @@ impl App {
             renderer,
             input_manager,
             map: vec![
-                vec![1,1,1,1,1,1,1,1,1,1],
-                vec![1,0,0,0,0,0,0,0,0,1],
-                vec![1,0,0,0,0,0,0,0,0,1],
-                vec![1,1,0,1,0,0,1,0,0,1],
-                vec![1,0,0,1,0,0,1,0,0,1],
-                vec![1,0,0,1,1,1,1,0,1,1],
-                vec![1,0,0,1,0,0,0,0,0,1],
-                vec![1,0,0,1,0,0,0,0,0,1],
-                vec![1,0,0,0,0,0,0,0,0,1],
-                vec![1,1,1,1,1,1,1,1,1,1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                vec![1, 1, 0, 1, 0, 0, 1, 0, 0, 1],
+                vec![1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+                vec![1, 0, 0, 1, 1, 1, 1, 0, 1, 1],
+                vec![1, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+                vec![1, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+                vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             ],
         }
     }
@@ -111,7 +113,6 @@ impl App {
         if let Some(size) = self.input_manager.request_resize {
             self.renderer.resize(size);
         }
-
 
         let delta = self.input_manager.elapsed().unwrap().as_secs_f32();
         let speed = 5.0 * delta;
@@ -129,22 +130,27 @@ impl App {
             self.dir_x = self.dir_x * (-1.5 * delta).cos() - self.dir_y * (-1.5 * delta).sin();
             self.dir_y = old_dir_x * (-1.5 * delta).sin() + self.dir_y * (-1.5 * delta).cos();
             let old_plane_x = self.plane_x;
-            self.plane_x = self.plane_x * (-1.5 * delta).cos() - self.plane_y * (-1.5 * delta).sin();
+            self.plane_x =
+                self.plane_x * (-1.5 * delta).cos() - self.plane_y * (-1.5 * delta).sin();
             self.plane_y = old_plane_x * (-1.5 * delta).sin() + self.plane_y * (-1.5 * delta).cos();
         }
         if self.input_manager.is_down(VirtualKeyCode::W) {
-            if self.map[self.player_y as usize][(self.player_x + self.dir_x * speed) as usize] == 0 {
+            if self.map[self.player_y as usize][(self.player_x + self.dir_x * speed) as usize] == 0
+            {
                 self.player_x += self.dir_x * speed;
             }
-            if self.map[(self.player_y + self.dir_y * speed) as usize][self.player_x as usize] == 0 {
+            if self.map[(self.player_y + self.dir_y * speed) as usize][self.player_x as usize] == 0
+            {
                 self.player_y += self.dir_y * speed;
             }
         }
         if self.input_manager.is_down(VirtualKeyCode::S) {
-            if self.map[self.player_y as usize][(self.player_x - self.dir_x * speed) as usize] == 0 {
+            if self.map[self.player_y as usize][(self.player_x - self.dir_x * speed) as usize] == 0
+            {
                 self.player_x -= self.dir_x * speed;
             }
-            if self.map[(self.player_y - self.dir_y * speed) as usize][self.player_x as usize] == 0 {
+            if self.map[(self.player_y - self.dir_y * speed) as usize][self.player_x as usize] == 0
+            {
                 self.player_y -= self.dir_y * speed;
             }
         }
@@ -158,6 +164,7 @@ impl App {
     fn draw(&mut self, bricks: &DynamicImage) {
         self.renderer.fill(&[0, 0, 0, 0xff]);
 
+        // cast a ray for each pixel column
         for x in 0..WIDTH {
             let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
             let ray_dir_x = self.dir_x + self.plane_x * camera_x;
@@ -182,6 +189,7 @@ impl App {
                 (1, (map_y as f32 + 1.0 - self.player_y) * delta_dist_y)
             };
 
+            // DDA algorithm
             while hit == 0 {
                 if side_dist_x < side_dist_y {
                     side_dist_x += delta_dist_x;
@@ -198,45 +206,55 @@ impl App {
                 }
             }
 
+            // correct fish-eye effect
             let perp_wall_dist = if side == 0 {
                 side_dist_x - delta_dist_x
             } else {
                 side_dist_y - delta_dist_y
             };
 
+            // used to index into wall texture
             let mut wall_x = if side == 0 {
                 self.player_y + perp_wall_dist * ray_dir_y
             } else {
                 self.player_x + perp_wall_dist * ray_dir_x
             };
-
             wall_x -= wall_x.floor();
 
             let mut tex_x = (wall_x * bricks.width() as f32) as u32;
-            if (side == 0 && ray_dir_x > 0.0) 
-                || (side == 1 && ray_dir_y < 0.0) {
+            if (side == 0 && ray_dir_x > 0.0) || (side == 1 && ray_dir_y < 0.0) {
                 tex_x = bricks.width() - tex_x - 1;
             }
 
             let line_height = (HEIGHT as f32 / perp_wall_dist) as i32;
             let top = HEIGHT / 2 - (line_height / 2);
-            let color = if side == 0 {
-                0x99
-            } else {
-                0xff
-            };
+            let color = if side == 0 { 0x99 } else { 0xff };
 
-            self.renderer.draw_vert_line(&[color, color, color, 0xff], x, top, line_height);
-            self.renderer.draw_sub_texture(bricks, x, top, PhysicalSize::new(1, line_height as u32), Rect {
+            let sub_image = Rect {
                 x: tex_x,
                 y: 0,
                 width: 1,
                 height: bricks.height(),
-            });
+            };
 
-            self.renderer.draw_vert_line(&[0x00, 0xff, 0xff, 0xff], x, 0, top);
-            self.renderer.draw_vert_line(&[0xff, 0x00, 0x00, 0xff], x, top+line_height, HEIGHT - (top+line_height));
+            // self.renderer.draw_vert_line(&[color, color, color, 0xff], x, top, line_height);
+            self.renderer.draw_sub_texture(
+                bricks,
+                &[color, color, color, 0xff],
+                x,
+                top,
+                PhysicalSize::new(1, line_height as u32),
+                sub_image,
+            );
 
+            self.renderer
+                .draw_vert_line(&[0x00, 0xff, 0xff, 0xff], x, 0, top);
+            self.renderer.draw_vert_line(
+                &[0xff, 0x00, 0x00, 0xff],
+                x,
+                top + line_height,
+                HEIGHT - (top + line_height),
+            );
         }
     }
 }
