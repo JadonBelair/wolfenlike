@@ -42,7 +42,9 @@ fn main() -> Result<()> {
             .unwrap()
     };
 
-    window.set_cursor_grab(winit::window::CursorGrabMode::Confined).unwrap();
+    window
+        .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+        .unwrap();
     window.set_cursor_visible(false);
 
     let renderer = Renderer::new(&window, WIDTH, HEIGHT)?;
@@ -132,45 +134,38 @@ impl App {
 
         let move_speed = 5.0 * delta;
 
+        let mut move_x = 0.0;
+        let mut move_y = 0.0;
+
         if self.input_manager.is_down(VirtualKeyCode::W) {
-            if self.map[self.player_y as usize][(self.player_x + self.dir_x * move_speed) as usize] == 0
-            {
-                self.player_x += self.dir_x * move_speed;
-            }
-            if self.map[(self.player_y + self.dir_y * move_speed) as usize][self.player_x as usize] == 0
-            {
-                self.player_y += self.dir_y * move_speed;
-            }
+            move_x += self.dir_x;
+            move_y += self.dir_y;
         }
         if self.input_manager.is_down(VirtualKeyCode::S) {
-            if self.map[self.player_y as usize][(self.player_x - self.dir_x * move_speed) as usize] == 0
-            {
-                self.player_x -= self.dir_x * move_speed;
-            }
-            if self.map[(self.player_y - self.dir_y * move_speed) as usize][self.player_x as usize] == 0
-            {
-                self.player_y -= self.dir_y * move_speed;
-            }
+            move_x -= self.dir_x;
+            move_y -= self.dir_y;
         }
         if self.input_manager.is_down(VirtualKeyCode::A) {
-            if self.map[(self.player_y + self.dir_x * move_speed) as usize][self.player_x as usize] == 0
-            {
-                self.player_y += self.dir_x * move_speed;
-            }
-            if self.map[self.player_y as usize][(self.player_x - self.dir_y * move_speed) as usize] == 0
-            {
-                self.player_x -= self.dir_y * move_speed;
-            }
+            move_y += self.dir_x;
+            move_x -= self.dir_y;
         }
         if self.input_manager.is_down(VirtualKeyCode::D) {
-            if self.map[(self.player_y - self.dir_x * move_speed) as usize][self.player_x as usize] == 0
-            {
-                self.player_y -= self.dir_x * move_speed;
-            }
-            if self.map[self.player_y as usize][(self.player_x + self.dir_y * move_speed) as usize] == 0
-            {
-                self.player_x += self.dir_y * move_speed;
-            }
+            move_y -= self.dir_x;
+            move_x += self.dir_y;
+        }
+
+        let dist = (move_x.powi(2) + move_y.powi(2)).sqrt();
+        move_x = move_x / dist;
+        move_y = move_y / dist;
+
+        move_x *= move_speed;
+        move_y *= move_speed;
+
+        if self.map[self.player_y as usize][(self.player_x + move_x) as usize] == 0 {
+            self.player_x += move_x;
+        }
+        if self.map[(self.player_y + move_y) as usize][self.player_x as usize] == 0 {
+            self.player_y += move_y;
         }
     }
 
@@ -219,7 +214,12 @@ impl App {
                     side = 1;
                 }
 
-                if map_y < 0 || map_y >= self.map.len() as i32 || map_x < 0 || map_x >= self.map[0].len() as i32 || self.map[map_y as usize][map_x as usize] > 0 {
+                if map_y < 0
+                    || map_y >= self.map.len() as i32
+                    || map_x < 0
+                    || map_x >= self.map[0].len() as i32
+                    || self.map[map_y as usize][map_x as usize] > 0
+                {
                     hit = 1;
                 }
             }
