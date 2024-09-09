@@ -124,7 +124,7 @@ impl InputManager {
 
     /// returns whether or not the given key is currently down
     pub fn is_down(&self, key: VirtualKeyCode) -> bool {
-        self.just_pressed.contains(&key) || self.held.contains(&key)
+        self.held.contains(&key)
     }
 
     /// returns whether or not the given key was just released
