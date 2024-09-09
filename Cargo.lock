@@ -2505,6 +2505,7 @@ dependencies = [
  "anyhow",
  "image",
  "pixels",
+ "rayon",
  "winit",
 ]
 

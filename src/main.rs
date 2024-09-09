@@ -3,16 +3,18 @@
 use anyhow::Result;
 use image::math::Rect;
 use image::DynamicImage;
+use rayon::iter::IntoParallelIterator;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::EventLoop;
 use winit::window::{Fullscreen, WindowBuilder};
+use rayon::prelude::ParallelIterator;
 
 use input::InputManager;
 use renderer::Renderer;
 
-const WIDTH: i32 = 180;
-const HEIGHT: i32 = 135;
+const WIDTH: i32 = 180 * 4;
+const HEIGHT: i32 = 135 * 4;
 
 mod input;
 mod renderer;
@@ -28,6 +30,17 @@ struct App {
     plane_x: f32,
     plane_y: f32,
     map: Vec<Vec<u32>>,
+}
+
+#[derive(Default, Clone, Copy)]
+struct Ray {
+    ray_dir_x: f32,
+    ray_dir_y: f32,
+    side_dist_x: f32,
+    side_dist_y: f32,
+    delta_dist_x: f32,
+    delta_dist_y: f32,
+    side: i32,
 }
 
 fn main() -> Result<()> {
@@ -177,6 +190,66 @@ impl App {
     fn draw(&mut self, bricks: &DynamicImage) {
         self.renderer.fill(&[0, 0, 0, 0xff]);
 
+        let mut z_buffer = (0..WIDTH)
+            .into_par_iter()
+            .map(|x| {
+                let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
+                let ray_dir_x = self.dir_x + self.plane_x * camera_x;
+                let ray_dir_y = self.dir_y + self.plane_y * camera_x;
+                let mut map_x = self.player_x as i32;
+                let mut map_y = self.player_y as i32;
+
+                let delta_dist_x = (1.0 / ray_dir_x).abs();
+                let delta_dist_y = (1.0 / ray_dir_y).abs();
+
+                let mut hit = 0;
+                let mut side = 0;
+
+                let (step_x, mut side_dist_x) = if ray_dir_x < 0.0 {
+                    (-1, (self.player_x - map_x as f32) * delta_dist_x)
+                } else {
+                    (1, (map_x as f32 + 1.0 - self.player_x) * delta_dist_x)
+                };
+                let (step_y, mut side_dist_y) = if ray_dir_y < 0.0 {
+                    (-1, (self.player_y - map_y as f32) * delta_dist_y)
+                } else {
+                    (1, (map_y as f32 + 1.0 - self.player_y) * delta_dist_y)
+                };
+
+                // DDA algorithm
+                while hit == 0 {
+                    if side_dist_x < side_dist_y {
+                        side_dist_x += delta_dist_x;
+                        map_x += step_x;
+                        side = 0;
+                    } else {
+                        side_dist_y += delta_dist_y;
+                        map_y += step_y;
+                        side = 1;
+                    }
+
+                    if map_y < 0
+                        || map_y >= self.map.len() as i32
+                        || map_x < 0
+                        || map_x >= self.map[0].len() as i32
+                        || self.map[map_y as usize][map_x as usize] > 0
+                    {
+                        hit = 1;
+                    }
+                }
+
+                Ray {
+                    ray_dir_x,
+                    ray_dir_y,
+                    side_dist_x,
+                    side_dist_y,
+                    delta_dist_x,
+                    delta_dist_y,
+                    side,
+                }
+            })
+            .collect::<Vec<Ray>>();
+
         // cast a ray for each pixel column
         for x in 0..WIDTH {
             let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
@@ -224,6 +297,26 @@ impl App {
                 }
             }
 
+            z_buffer[x as usize] = Ray {
+                ray_dir_x,
+                ray_dir_y,
+                side_dist_x,
+                side_dist_y,
+                delta_dist_x,
+                delta_dist_y,
+                side,
+            };
+        }
+
+        for (x, ray) in z_buffer.iter().enumerate() {
+            let ray_dir_x = ray.ray_dir_x;
+            let ray_dir_y = ray.ray_dir_y;
+            let side_dist_x = ray.side_dist_x;
+            let side_dist_y = ray.side_dist_y;
+            let delta_dist_x = ray.delta_dist_x;
+            let delta_dist_y = ray.delta_dist_y;
+            let side = ray.side;
+
             // correct fish-eye effect
             let perp_wall_dist = if side == 0 {
                 side_dist_x - delta_dist_x
@@ -247,7 +340,8 @@ impl App {
             let line_height = (HEIGHT as f32 / perp_wall_dist) as i32;
             let top = HEIGHT / 2 - (line_height / 2);
             let color = if side == 0 { 0x99 } else { 0xff } as f32;
-            let color = (255.0 * (line_height as f32 / HEIGHT as f32) * (color / 255.0)).clamp(0.0, 255.0) as u8;
+            let shade = 255.0 * (line_height as f32 / HEIGHT as f32);
+            let color = (color * shade / 255.0).clamp(0.0, 255.0) as u8;
 
             let sub_image = Rect {
                 x: tex_x,
@@ -260,17 +354,17 @@ impl App {
             self.renderer.draw_sub_texture(
                 bricks,
                 &[color, color, color, 0xff],
-                x,
+                x as i32,
                 top,
                 PhysicalSize::new(1, line_height as u32),
                 sub_image,
             );
 
             self.renderer
-                .draw_vert_line(&[0x00, 0xff, 0xff, 0xff], x, 0, top);
+                .draw_vert_line(&[0x00, 0xff, 0xff, 0xff], x as i32, 0, top);
             self.renderer.draw_vert_line(
                 &[0xff, 0x00, 0x00, 0xff],
-                x,
+                x as i32,
                 top + line_height,
                 HEIGHT - (top + line_height),
             );
