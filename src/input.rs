@@ -25,7 +25,7 @@ impl InputManager {
         }
     }
 
-    /// processes the current event and returns true 
+    /// processes the current event and returns true
     /// when there are no more events to process
     pub fn process_event(&mut self, event: &Event<'_, ()>) -> bool {
         match event {
@@ -75,9 +75,7 @@ impl InputManager {
                 false
             }
             Event::DeviceEvent {
-                event: DeviceEvent::MouseMotion {
-                    delta
-                },
+                event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
                 self.mouse_motion = *delta;

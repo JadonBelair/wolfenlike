@@ -36,7 +36,9 @@ impl Renderer {
 
     /// fills the frame with the given color
     pub fn fill(&mut self, color: &[u8; 4]) {
-        self.frame_buffer.frame_mut().copy_from_slice(&color.repeat((self.width * self.height) as usize));
+        self.frame_buffer
+            .frame_mut()
+            .copy_from_slice(&color.repeat((self.width * self.height) as usize));
     }
 
     /// draws a vertical line starting at the given x and top y with the given height
@@ -229,7 +231,7 @@ impl Renderer {
                 break;
             }
 
-            for c_x in((clamped_x as i32 - x) as u32)..size.width {
+            for c_x in ((clamped_x as i32 - x) as u32)..size.width {
                 let offset_x = c_x as i32 + x;
 
                 if offset_x < 0 {
@@ -285,12 +287,13 @@ impl Renderer {
                 }
 
                 let pix = subimage
-                    .get_pixel((c_x as f32 * x_scale) as u32, (c_y as f32 * y_scale) as u32).0;
+                    .get_pixel((c_x as f32 * x_scale) as u32, (c_y as f32 * y_scale) as u32)
+                    .0;
                 let color = [
-                    (pix[0] as f32  * (color[0] as f32 / 255.0)) as u8,
-                    (pix[1] as f32  * (color[1] as f32 / 255.0)) as u8,
-                    (pix[2] as f32  * (color[2] as f32 / 255.0)) as u8,
-                    (pix[3] as f32  * (color[3] as f32 / 255.0)) as u8,
+                    (pix[0] as f32 * (color[0] as f32 / 255.0)) as u8,
+                    (pix[1] as f32 * (color[1] as f32 / 255.0)) as u8,
+                    (pix[2] as f32 * (color[2] as f32 / 255.0)) as u8,
+                    (pix[3] as f32 * (color[3] as f32 / 255.0)) as u8,
                 ];
                 self.draw_pixel(&color, offset_x, offset_y);
             }
