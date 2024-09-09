@@ -246,7 +246,8 @@ impl App {
 
             let line_height = (HEIGHT as f32 / perp_wall_dist) as i32;
             let top = HEIGHT / 2 - (line_height / 2);
-            let color = if side == 0 { 0x99 } else { 0xff };
+            let color = if side == 0 { 0x99 } else { 0xff } as f32;
+            let color = (255.0 * (line_height as f32 / HEIGHT as f32) * (color / 255.0)).clamp(0.0, 255.0) as u8;
 
             let sub_image = Rect {
                 x: tex_x,
