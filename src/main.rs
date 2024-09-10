@@ -2,11 +2,11 @@ use anyhow::Result;
 use image::math::Rect;
 use image::{DynamicImage, GenericImageView};
 use rayon::iter::IntoParallelIterator;
+use rayon::prelude::ParallelIterator;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::EventLoop;
 use winit::window::{Fullscreen, WindowBuilder};
-use rayon::prelude::ParallelIterator;
 
 use input::InputManager;
 use renderer::Renderer;
@@ -28,7 +28,10 @@ struct App {
     dir_y: f32,
     plane_x: f32,
     plane_y: f32,
-    map: Vec<Vec<u32>>,
+    walls: Vec<Vec<u32>>,
+    floor: Vec<Vec<u32>>,
+    ceiling: Vec<Vec<u32>>,
+    textures: Vec<DynamicImage>,
 }
 
 #[derive(Default, Clone, Copy)]
@@ -39,6 +42,8 @@ struct Ray {
     side_dist_y: f32,
     delta_dist_x: f32,
     delta_dist_y: f32,
+    map_x: i32,
+    map_y: i32,
     side: i32,
 }
 
@@ -63,15 +68,15 @@ fn main() -> Result<()> {
     let input_manager = InputManager::new();
     let mut world = App::new(renderer, input_manager);
 
-    let bricks = image::open("./images/Brick1a.png")?;
-    let stone1 = image::open("./images/Stone1.png")?;
-    let stone4 = image::open("./images/Stone4.png")?;
+    world.push_texture(image::open("./images/Brick1a.png")?);
+    world.push_texture(image::open("./images/Stone1.png")?);
+    world.push_texture(image::open("./images/Stone4.png")?);
 
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_poll();
 
         if let Event::RedrawRequested(_) = event {
-            world.draw(&bricks, &stone1, &stone4);
+            world.draw();
             if let Err(_) = world.render() {
                 control_flow.set_exit();
                 return;
@@ -110,11 +115,12 @@ impl App {
             dir_y: 0.0,
             plane_x: 0.0,
             plane_y: 0.66,
+            textures: Vec::new(),
             renderer,
             input_manager,
-            map: vec![
+            walls: vec![
                 vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                vec![2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
                 vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
                 vec![1, 1, 0, 1, 0, 0, 1, 0, 0, 1],
                 vec![1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
@@ -124,7 +130,36 @@ impl App {
                 vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
                 vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             ],
+            floor: vec![
+                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+            ],
+            ceiling: vec![
+                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+            ],
         }
+    }
+
+    fn push_texture(&mut self, texture: DynamicImage) -> usize {
+        self.textures.push(texture);
+        self.textures.len() - 1
     }
 
     /// Update the `World` internal state; bounce the box around the screen.
@@ -175,10 +210,10 @@ impl App {
         move_x *= move_speed;
         move_y *= move_speed;
 
-        if self.map[self.player_y as usize][(self.player_x + move_x) as usize] == 0 {
+        if self.walls[self.player_y as usize][(self.player_x + move_x) as usize] == 0 {
             self.player_x += move_x;
         }
-        if self.map[(self.player_y + move_y) as usize][self.player_x as usize] == 0 {
+        if self.walls[(self.player_y + move_y) as usize][self.player_x as usize] == 0 {
             self.player_y += move_y;
         }
     }
@@ -188,7 +223,7 @@ impl App {
     }
 
     /// Draw the `World` state to the frame buffer.
-    fn draw(&mut self, bricks: &DynamicImage, stone1: &DynamicImage, stone4: &DynamicImage) {
+    fn draw(&mut self) {
         self.renderer.fill(&[0, 0, 0, 0xff]);
 
         // cast a ray for each pixel column
@@ -231,10 +266,10 @@ impl App {
                     }
 
                     if map_y < 0
-                        || map_y >= self.map.len() as i32
+                        || map_y >= self.walls.len() as i32
                         || map_x < 0
-                        || map_x >= self.map[0].len() as i32
-                        || self.map[map_y as usize][map_x as usize] > 0
+                        || map_x >= self.walls[0].len() as i32
+                        || self.walls[map_y as usize][map_x as usize] > 0
                     {
                         hit = 1;
                     }
@@ -247,12 +282,14 @@ impl App {
                     side_dist_y,
                     delta_dist_x,
                     delta_dist_y,
+                    map_x,
+                    map_y,
                     side,
                 }
             })
             .collect::<Vec<Ray>>();
 
-        for y in (HEIGHT/2)..HEIGHT {
+        for y in (HEIGHT / 2)..HEIGHT {
             let ray_dir_x0 = self.dir_x + self.plane_x;
             let ray_dir_y0 = self.dir_y + self.plane_y;
             let ray_dir_x1 = self.dir_x - self.plane_x;
@@ -273,26 +310,53 @@ impl App {
                 let cell_x = floor_x as i32;
                 let cell_y = floor_y as i32;
 
-                let tx = (bricks.width() as f32 * (floor_x - cell_x as f32)) as u32 & (bricks.width() - 1);
-                let ty = (bricks.height() as f32 * (floor_y - cell_y as f32)) as u32 & (bricks.height() - 1);
+                let floor_texture_id = (self
+                    .floor
+                    .get(cell_y as usize)
+                    .map(|row| *row.get(cell_x as usize).unwrap_or(&1))
+                    .map(|id| if id == 0 { 1 } else { id })
+                    .unwrap_or(1)
+                    - 1) as usize;
+                let floor_texture = &self.textures[floor_texture_id];
+
+                let ceil_texture_id = (self
+                    .ceiling
+                    .get(cell_y as usize)
+                    .map(|row| *row.get(cell_x as usize).unwrap_or(&1))
+                    .map(|id| if id == 0 { 1 } else { id })
+                    .unwrap_or(1)
+                    - 1) as usize;
+                let ceil_texture = &self.textures[ceil_texture_id];
+
+                let floor_tx = (floor_texture.width() as f32 * (floor_x - cell_x as f32)) as u32
+                    & (floor_texture.width() - 1);
+                let floor_ty = (floor_texture.height() as f32 * (floor_y - cell_y as f32)) as u32
+                    & (floor_texture.height() - 1);
+                let ceil_tx = (floor_texture.width() as f32 * (floor_x - cell_x as f32)) as u32
+                    & (floor_texture.width() - 1);
+                let ceil_ty = (ceil_texture.height() as f32 * (floor_y - cell_y as f32)) as u32
+                    & (ceil_texture.height() - 1);
 
                 floor_x += floor_step_x;
                 floor_y += floor_step_y;
 
-                let color = if (cell_x % 2 == 0 && cell_y % 2 == 1) || (cell_x % 2 == 1 && cell_y % 2 == 0) {
-                    stone1.get_pixel(tx, ty)
-                } else {
-                    stone4.get_pixel(tx, ty)
-                };
-                let color = [
-                    (color[0] as f32 * shade).clamp(0.0, 255.0) as u8,
-                    (color[1] as f32 * shade).clamp(0.0, 255.0) as u8,
-                    (color[2] as f32 * shade).clamp(0.0, 255.0) as u8,
-                    (color[3] as f32 * shade).clamp(0.0, 255.0) as u8,
+                let floor_color = floor_texture.get_pixel(floor_tx, floor_ty);
+                let floor_color = [
+                    (floor_color[0] as f32 * shade).clamp(0.0, 255.0) as u8,
+                    (floor_color[1] as f32 * shade).clamp(0.0, 255.0) as u8,
+                    (floor_color[2] as f32 * shade).clamp(0.0, 255.0) as u8,
+                    (floor_color[3] as f32 * shade).clamp(0.0, 255.0) as u8,
                 ];
+                self.renderer.draw_pixel(&floor_color, x, y);
 
-                self.renderer.draw_pixel(&color, x, y);
-                self.renderer.draw_pixel(&color, x, HEIGHT - y);
+                let ceil_color = ceil_texture.get_pixel(ceil_tx, ceil_ty);
+                let ceil_color = [
+                    (ceil_color[0] as f32 * shade).clamp(0.0, 255.0) as u8,
+                    (ceil_color[1] as f32 * shade).clamp(0.0, 255.0) as u8,
+                    (ceil_color[2] as f32 * shade).clamp(0.0, 255.0) as u8,
+                    (ceil_color[3] as f32 * shade).clamp(0.0, 255.0) as u8,
+                ];
+                self.renderer.draw_pixel(&ceil_color, x, HEIGHT - y);
             }
         }
 
@@ -303,7 +367,17 @@ impl App {
             let side_dist_y = ray.side_dist_y;
             let delta_dist_x = ray.delta_dist_x;
             let delta_dist_y = ray.delta_dist_y;
+            let map_x = ray.map_x;
+            let map_y = ray.map_y;
             let side = ray.side;
+
+            let texture_id = self
+                .walls
+                .get(map_y as usize)
+                .map(|row| *row.get(map_x as usize).unwrap_or(&1))
+                .unwrap_or(1) as usize
+                - 1;
+            let texture = &self.textures[texture_id];
 
             // correct fish-eye effect
             let perp_wall_dist = if side == 0 {
@@ -320,13 +394,13 @@ impl App {
             };
             wall_x -= wall_x.floor();
 
-            let mut tex_x = (wall_x * bricks.width() as f32) as u32;
+            let mut tex_x = (wall_x * texture.width() as f32) as u32;
             // unmirrors texture on certain walls
-            if (side == 0 && ray_dir_x > 0.0) || (side == 1 && ray_dir_y < 0.0) {
-                tex_x = bricks.width() - tex_x - 1;
+            if (side == 0 && ray_dir_x < 0.0) || (side == 1 && ray_dir_y > 0.0) {
+                tex_x = texture.width() - tex_x - 1;
             }
 
-            // ceiling the line height mostly removes an issue where there 
+            // ceiling the line height mostly removes an issue where there
             // will be a pixel of the floor/roof at the edges of the wall
             let line_height = (HEIGHT as f32 / perp_wall_dist).ceil() as i32;
             let top = HEIGHT / 2 - (line_height / 2);
@@ -338,11 +412,11 @@ impl App {
                 x: tex_x,
                 y: 0,
                 width: 1,
-                height: bricks.height(),
+                height: texture.height(),
             };
 
             self.renderer.draw_sub_texture(
-                bricks,
+                texture,
                 &[color, color, color, 0xff],
                 x as i32,
                 top,
