@@ -60,9 +60,9 @@ struct Entity {
 fn main() -> Result<()> {
     let event_loop = EventLoop::new();
     let window = {
-        let size = LogicalSize::new(1280.0, 720.0);
+        let size = LogicalSize::new(WIDTH, HEIGHT);
         WindowBuilder::new()
-            .with_title("Hello Pixels")
+            .with_title("Wolfenstein Clone")
             .with_inner_size(size)
             .with_min_inner_size(size)
             .build(&event_loop)
