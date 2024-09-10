@@ -3,7 +3,7 @@
 use std::time::{Duration, Instant};
 use winit::{
     dpi::PhysicalSize,
-    event::{DeviceEvent, ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent},
 };
 
 #[derive(Default)]
@@ -14,6 +14,8 @@ pub struct InputManager {
     pub request_exit: bool,
     pub request_resize: Option<PhysicalSize<u32>>,
     mouse_motion: (f64, f64),
+    mouse_buttons: [bool; 2],
+    old_mouse_buttons: [bool; 2],
     start_time: Option<Instant>,
     delta_time: Option<Duration>,
 }
@@ -36,6 +38,7 @@ impl InputManager {
                 self.released.clear();
 
                 self.mouse_motion = (0.0, 0.0);
+                self.old_mouse_buttons = self.mouse_buttons;
 
                 self.start_time.get_or_insert(Instant::now());
                 self.delta_time = None;
@@ -71,6 +74,22 @@ impl InputManager {
                 if !self.just_pressed.contains(&keycode) {
                     self.just_pressed.push(*keycode);
                     self.held.push(*keycode);
+                }
+                false
+            }
+            Event::WindowEvent {
+                event: WindowEvent::MouseInput {
+                    button,
+                    state,
+                    ..
+                },
+                ..
+            } => {
+                let state = *state == ElementState::Pressed;
+                match button {
+                    MouseButton::Left => self.mouse_buttons[0] = state,
+                    MouseButton::Right => self.mouse_buttons[0] = state,
+                    _ => ()
                 }
                 false
             }
@@ -137,5 +156,21 @@ impl InputManager {
 
     pub fn mouse_motion(&self) -> (f64, f64) {
         self.mouse_motion
+    }
+
+    pub fn is_mouse_down(&self, button: MouseButton) -> bool {
+        match button {
+            MouseButton::Left => self.mouse_buttons[0],
+            MouseButton::Right => self.mouse_buttons[1],
+            _ => false,
+        }
+    }
+
+    pub fn is_mouse_just_pressed(&self, button: MouseButton) -> bool {
+        match button {
+            MouseButton::Left => self.mouse_buttons[0] && !self.old_mouse_buttons[0],
+            MouseButton::Right => self.mouse_buttons[1] && !self.old_mouse_buttons[1],
+            _ => false,
+        }
     }
 }
