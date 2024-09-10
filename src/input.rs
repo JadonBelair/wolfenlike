@@ -3,7 +3,9 @@
 use std::time::{Duration, Instant};
 use winit::{
     dpi::PhysicalSize,
-    event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent},
+    event::{
+        DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent,
+    },
 };
 
 #[derive(Default)]
@@ -78,18 +80,14 @@ impl InputManager {
                 false
             }
             Event::WindowEvent {
-                event: WindowEvent::MouseInput {
-                    button,
-                    state,
-                    ..
-                },
+                event: WindowEvent::MouseInput { button, state, .. },
                 ..
             } => {
                 let state = *state == ElementState::Pressed;
                 match button {
                     MouseButton::Left => self.mouse_buttons[0] = state,
                     MouseButton::Right => self.mouse_buttons[1] = state,
-                    _ => ()
+                    _ => (),
                 }
                 false
             }
@@ -154,10 +152,12 @@ impl InputManager {
         self.delta_time
     }
 
+    /// returns the mouse motion since the last frame
     pub fn mouse_motion(&self) -> (f64, f64) {
         self.mouse_motion
     }
 
+    /// returns if the given mouse button is currently down
     pub fn is_mouse_down(&self, button: MouseButton) -> bool {
         match button {
             MouseButton::Left => self.mouse_buttons[0],
@@ -166,6 +166,7 @@ impl InputManager {
         }
     }
 
+    /// returns if the given mouse button was pressed this frame
     pub fn is_mouse_just_pressed(&self, button: MouseButton) -> bool {
         match button {
             MouseButton::Left => self.mouse_buttons[0] && !self.old_mouse_buttons[0],
