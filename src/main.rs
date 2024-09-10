@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use anyhow::Result;
 use image::math::Rect;
 use image::DynamicImage;
@@ -190,7 +188,8 @@ impl App {
     fn draw(&mut self, bricks: &DynamicImage) {
         self.renderer.fill(&[0, 0, 0, 0xff]);
 
-        let mut z_buffer = (0..WIDTH)
+        // cast a ray for each pixel column
+        let z_buffer = (0..WIDTH)
             .into_par_iter()
             .map(|x| {
                 let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
@@ -250,64 +249,6 @@ impl App {
             })
             .collect::<Vec<Ray>>();
 
-        // cast a ray for each pixel column
-        for x in 0..WIDTH {
-            let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
-            let ray_dir_x = self.dir_x + self.plane_x * camera_x;
-            let ray_dir_y = self.dir_y + self.plane_y * camera_x;
-            let mut map_x = self.player_x as i32;
-            let mut map_y = self.player_y as i32;
-
-            let delta_dist_x = (1.0 / ray_dir_x).abs();
-            let delta_dist_y = (1.0 / ray_dir_y).abs();
-
-            let mut hit = 0;
-            let mut side = 0;
-
-            let (step_x, mut side_dist_x) = if ray_dir_x < 0.0 {
-                (-1, (self.player_x - map_x as f32) * delta_dist_x)
-            } else {
-                (1, (map_x as f32 + 1.0 - self.player_x) * delta_dist_x)
-            };
-            let (step_y, mut side_dist_y) = if ray_dir_y < 0.0 {
-                (-1, (self.player_y - map_y as f32) * delta_dist_y)
-            } else {
-                (1, (map_y as f32 + 1.0 - self.player_y) * delta_dist_y)
-            };
-
-            // DDA algorithm
-            while hit == 0 {
-                if side_dist_x < side_dist_y {
-                    side_dist_x += delta_dist_x;
-                    map_x += step_x;
-                    side = 0;
-                } else {
-                    side_dist_y += delta_dist_y;
-                    map_y += step_y;
-                    side = 1;
-                }
-
-                if map_y < 0
-                    || map_y >= self.map.len() as i32
-                    || map_x < 0
-                    || map_x >= self.map[0].len() as i32
-                    || self.map[map_y as usize][map_x as usize] > 0
-                {
-                    hit = 1;
-                }
-            }
-
-            z_buffer[x as usize] = Ray {
-                ray_dir_x,
-                ray_dir_y,
-                side_dist_x,
-                side_dist_y,
-                delta_dist_x,
-                delta_dist_y,
-                side,
-            };
-        }
-
         for (x, ray) in z_buffer.iter().enumerate() {
             let ray_dir_x = ray.ray_dir_x;
             let ray_dir_y = ray.ray_dir_y;
@@ -350,7 +291,6 @@ impl App {
                 height: bricks.height(),
             };
 
-            // self.renderer.draw_vert_line(&[color, color, color, 0xff], x, top, line_height);
             self.renderer.draw_sub_texture(
                 bricks,
                 &[color, color, color, 0xff],
