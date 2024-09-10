@@ -249,10 +249,19 @@ impl App {
         }
 
         if self.input_manager.is_mouse_just_pressed(MouseButton::Left) {
-            self.entities.push(Entity::new(self.player_x, self.player_y, 5, EntityType::Projectile(self.dir_x * 8.0, self.dir_y * 8.0)));
+            self.entities.push(Entity::new(
+                self.player_x,
+                self.player_y,
+                5,
+                EntityType::Projectile(self.dir_x * 8.0, self.dir_y * 8.0),
+            ));
         }
 
-        for projectile in self.entities.iter_mut().filter(|e| matches!(e.entity_type, EntityType::Projectile(..))) {
+        for projectile in self
+            .entities
+            .iter_mut()
+            .filter(|e| matches!(e.entity_type, EntityType::Projectile(..)))
+        {
             if let EntityType::Projectile(x_vel, y_vel) = projectile.entity_type {
                 projectile.x_pos += x_vel * delta;
                 projectile.y_pos += y_vel * delta;
@@ -262,7 +271,12 @@ impl App {
         for i in (0..self.entities.len()).rev() {
             let entity = &self.entities[i];
 
-            if entity.x_pos < 0.0 || entity.x_pos >= WIDTH as f32 || entity.y_pos < 0.0 || entity.y_pos >= HEIGHT as f32 || self.walls[entity.y_pos as usize][entity.x_pos as usize] != 0 {
+            if entity.x_pos < 0.0
+                || entity.x_pos >= WIDTH as f32
+                || entity.y_pos < 0.0
+                || entity.y_pos >= HEIGHT as f32
+                || self.walls[entity.y_pos as usize][entity.x_pos as usize] != 0
+            {
                 self.entities.remove(i);
             }
         }
@@ -395,9 +409,11 @@ impl App {
                 {
                     if id > 0 {
                         let ceil_texture = &self.textures[id as usize - 1];
-                        let ceil_tx = (ceil_texture.width() as f32 * (floor_x - cell_x as f32)) as u32
+                        let ceil_tx = (ceil_texture.width() as f32 * (floor_x - cell_x as f32))
+                            as u32
                             & (ceil_texture.width() - 1);
-                        let ceil_ty = (ceil_texture.height() as f32 * (floor_y - cell_y as f32)) as u32
+                        let ceil_ty = (ceil_texture.height() as f32 * (floor_y - cell_y as f32))
+                            as u32
                             & (ceil_texture.height() - 1);
 
                         let ceil_color = ceil_texture.get_pixel(ceil_tx, ceil_ty);
@@ -431,7 +447,6 @@ impl App {
                 .unwrap_or(1) as usize
                 - 1;
             let texture = &self.textures[texture_id];
-
 
             // used to index into wall texture
             let mut wall_x = if side == 0 {
@@ -472,11 +487,16 @@ impl App {
             );
         }
 
-        let distance = self.entities.iter().map(|e| (self.player_x - e.x_pos).powi(2) + (self.player_y - e.y_pos).powi(2));
-        let mut distance = (0..self.entities.len()).zip(distance).collect::<Vec<(usize, f32)>>();
+        let distance = self
+            .entities
+            .iter()
+            .map(|e| (self.player_x - e.x_pos).powi(2) + (self.player_y - e.y_pos).powi(2));
+        let mut distance = (0..self.entities.len())
+            .zip(distance)
+            .collect::<Vec<(usize, f32)>>();
 
         // sort farthest entity first
-        distance.sort_by(|(_, a), (_ ,b)| b.total_cmp(a));
+        distance.sort_by(|(_, a), (_, b)| b.total_cmp(a));
         for index in distance.iter().map(|(i, _)| *i) {
             let sprite_x = self.entities[index].x_pos - self.player_x;
             let sprite_y = self.entities[index].y_pos - self.player_y;
@@ -486,9 +506,9 @@ impl App {
             let transform_x = inv_det * (self.dir_y * sprite_x - self.dir_x * sprite_y);
             let transform_y = inv_det * (-self.plane_y * sprite_x + self.plane_x * sprite_y);
 
-            let sprite_screen_x = ((WIDTH/2) as f32 * (1.0 + transform_x / transform_y)) as i32;
+            let sprite_screen_x = ((WIDTH / 2) as f32 * (1.0 + transform_x / transform_y)) as i32;
 
-            let sprite_width = ((HEIGHT as f32/ transform_y) as i32).abs();
+            let sprite_width = ((HEIGHT as f32 / transform_y) as i32).abs();
             let sprite_height = ((HEIGHT as f32 / transform_y) as i32).abs();
 
             let draw_start_y = -sprite_height / 2 + HEIGHT / 2;
@@ -507,11 +527,20 @@ impl App {
             ];
 
             for stripe in draw_start_x..draw_end_x {
-                let tex_x = ((256 * (stripe - (-sprite_width / 2 + sprite_screen_x)) * texture.width() as i32 / sprite_width) / 256).clamp(0, texture.width() as i32 - 1);
+                let tex_x = ((256
+                    * (stripe - (-sprite_width / 2 + sprite_screen_x))
+                    * texture.width() as i32
+                    / sprite_width)
+                    / 256)
+                    .clamp(0, texture.width() as i32 - 1);
 
                 let stripe = WIDTH - stripe;
 
-                if transform_y > 0.0 && stripe > 0 && stripe < WIDTH && transform_y < z_buffer[stripe as usize].ray_dist {
+                if transform_y > 0.0
+                    && stripe > 0
+                    && stripe < WIDTH
+                    && transform_y < z_buffer[stripe as usize].ray_dist
+                {
                     let strip = Rect {
                         x: tex_x as u32,
                         y: 0,
@@ -519,7 +548,14 @@ impl App {
                         height: texture.height(),
                     };
 
-                    self.renderer.draw_sub_texture(texture, &color, stripe, draw_start_y, PhysicalSize::new(1, sprite_height as u32), strip);
+                    self.renderer.draw_sub_texture(
+                        texture,
+                        &color,
+                        stripe,
+                        draw_start_y,
+                        PhysicalSize::new(1, sprite_height as u32),
+                        strip,
+                    );
                 }
             }
         }
