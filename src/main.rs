@@ -11,8 +11,9 @@ use rayon::prelude::ParallelIterator;
 use input::InputManager;
 use renderer::Renderer;
 
-const WIDTH: i32 = 180 * 4;
-const HEIGHT: i32 = 135 * 4;
+const SCALE: i32 = 4;
+const WIDTH: i32 = 180 * SCALE;
+const HEIGHT: i32 = 135 * SCALE;
 
 mod input;
 mod renderer;
@@ -63,12 +64,14 @@ fn main() -> Result<()> {
     let mut world = App::new(renderer, input_manager);
 
     let bricks = image::open("./images/Brick1a.png")?;
+    let stone1 = image::open("./images/Stone1.png")?;
+    let stone4 = image::open("./images/Stone4.png")?;
 
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_poll();
 
         if let Event::RedrawRequested(_) = event {
-            world.draw(&bricks);
+            world.draw(&bricks, &stone1, &stone4);
             if let Err(_) = world.render() {
                 control_flow.set_exit();
                 return;
@@ -185,7 +188,7 @@ impl App {
     }
 
     /// Draw the `World` state to the frame buffer.
-    fn draw(&mut self, bricks: &DynamicImage) {
+    fn draw(&mut self, bricks: &DynamicImage, stone1: &DynamicImage, stone4: &DynamicImage) {
         self.renderer.fill(&[0, 0, 0, 0xff]);
 
         // cast a ray for each pixel column
@@ -255,20 +258,16 @@ impl App {
             let ray_dir_x1 = self.dir_x - self.plane_x;
             let ray_dir_y1 = self.dir_y - self.plane_y;
 
-            let p = y - HEIGHT / 2;
-            let pos_z = if p != 0 {
-                0.5 * HEIGHT as f32
-            } else {
-                1e30
-            };
-
-            let row_dist = pos_z / p as f32;
+            // minimal division distance calculation
+            let row_dist = HEIGHT as f32 / ((y << 1) as f32 - HEIGHT as f32);
 
             let floor_step_x = row_dist * (ray_dir_x1 - ray_dir_x0) / WIDTH as f32;
             let floor_step_y = row_dist * (ray_dir_y1 - ray_dir_y0) / WIDTH as f32;
 
             let mut floor_x = self.player_x + row_dist * ray_dir_x0;
             let mut floor_y = self.player_y + row_dist * ray_dir_y0;
+
+            let shade = ((y - (HEIGHT >> 1)) << 1) as f32 / HEIGHT as f32;
 
             for x in 0..WIDTH {
                 let cell_x = floor_x as i32;
@@ -279,12 +278,17 @@ impl App {
 
                 floor_x += floor_step_x;
                 floor_y += floor_step_y;
-                let color = bricks.get_pixel(tx, ty);
+
+                let color = if (cell_x % 2 == 0 && cell_y % 2 == 1) || (cell_x % 2 == 1 && cell_y % 2 == 0) {
+                    stone1.get_pixel(tx, ty)
+                } else {
+                    stone4.get_pixel(tx, ty)
+                };
                 let color = [
-                    color[0] - (color[0] as f32 * (row_dist / 12 as f32)).clamp(0.0, 255.0) as u8,
-                    color[1] - (color[1] as f32 * (row_dist / 12 as f32)).clamp(0.0, 255.0) as u8,
-                    color[2] - (color[2] as f32 * (row_dist / 12 as f32)).clamp(0.0, 255.0) as u8,
-                    color[3] - (color[3] as f32 * (row_dist / 12 as f32)).clamp(0.0, 255.0) as u8,
+                    (color[0] as f32 * shade).clamp(0.0, 255.0) as u8,
+                    (color[1] as f32 * shade).clamp(0.0, 255.0) as u8,
+                    (color[2] as f32 * shade).clamp(0.0, 255.0) as u8,
+                    (color[3] as f32 * shade).clamp(0.0, 255.0) as u8,
                 ];
 
                 self.renderer.draw_pixel(&color, x, y);
@@ -317,11 +321,14 @@ impl App {
             wall_x -= wall_x.floor();
 
             let mut tex_x = (wall_x * bricks.width() as f32) as u32;
+            // unmirrors texture on certain walls
             if (side == 0 && ray_dir_x > 0.0) || (side == 1 && ray_dir_y < 0.0) {
                 tex_x = bricks.width() - tex_x - 1;
             }
 
-            let line_height = (HEIGHT as f32 / perp_wall_dist) as i32;
+            // ceiling the line height mostly removes an issue where there 
+            // will be a pixel of the floor/roof at the edges of the wall
+            let line_height = (HEIGHT as f32 / perp_wall_dist).ceil() as i32;
             let top = HEIGHT / 2 - (line_height / 2);
             let color = if side == 0 { 0x99 } else { 0xff } as f32;
             let shade = 255.0 * (line_height as f32 / HEIGHT as f32);
