@@ -4,7 +4,7 @@ use image::{DynamicImage, GenericImageView};
 use rayon::iter::IntoParallelIterator;
 use rayon::prelude::ParallelIterator;
 use winit::dpi::{LogicalSize, PhysicalSize};
-use winit::event::{Event, VirtualKeyCode};
+use winit::event::{Event, MouseButton, VirtualKeyCode};
 use winit::event_loop::EventLoop;
 use winit::window::{Fullscreen, WindowBuilder};
 
@@ -31,6 +31,7 @@ struct App {
     walls: Vec<Vec<u32>>,
     floor: Vec<Vec<u32>>,
     ceiling: Vec<Vec<u32>>,
+    entities: Vec<Entity>,
     textures: Vec<DynamicImage>,
 }
 
@@ -38,13 +39,22 @@ struct App {
 struct Ray {
     ray_dir_x: f32,
     ray_dir_y: f32,
-    side_dist_x: f32,
-    side_dist_y: f32,
-    delta_dist_x: f32,
-    delta_dist_y: f32,
+    ray_dist: f32,
     map_x: i32,
     map_y: i32,
     side: i32,
+}
+
+enum EntityType {
+    Stationary,
+    Projectile(f32, f32),
+}
+
+struct Entity {
+    x_pos: f32,
+    y_pos: f32,
+    texture_id: usize,
+    entity_type: EntityType,
 }
 
 fn main() -> Result<()> {
@@ -71,6 +81,9 @@ fn main() -> Result<()> {
     world.push_texture(image::open("./images/Brick1a.png")?);
     world.push_texture(image::open("./images/Stone1.png")?);
     world.push_texture(image::open("./images/Stone4.png")?);
+    world.push_texture(image::open("./images/New Column1.png")?);
+    world.push_texture(image::open("./images/Barrel1.png")?);
+    world.push_texture(image::open("./images/Bullet.png")?);
 
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_poll();
@@ -103,6 +116,17 @@ fn main() -> Result<()> {
             window.request_redraw();
         }
     });
+}
+
+impl Entity {
+    fn new(x_pos: f32, y_pos: f32, texture_id: usize, entity_type: EntityType) -> Self {
+        Self {
+            x_pos,
+            y_pos,
+            texture_id,
+            entity_type,
+        }
+    }
 }
 
 impl App {
@@ -153,6 +177,13 @@ impl App {
                 vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
                 vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
                 vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
+            ],
+            entities: vec![
+                Entity::new(8.5, 1.5, 3, EntityType::Stationary),
+                Entity::new(8.5, 4.5, 3, EntityType::Stationary),
+                Entity::new(8.5, 2.5, 4, EntityType::Stationary),
+                Entity::new(8.5, 3.5, 4, EntityType::Stationary),
+                Entity::new(8.0, 3.0, 4, EntityType::Stationary),
             ],
         }
     }
@@ -216,6 +247,25 @@ impl App {
         if self.walls[(self.player_y + move_y) as usize][self.player_x as usize] == 0 {
             self.player_y += move_y;
         }
+
+        if self.input_manager.is_mouse_just_pressed(MouseButton::Left) {
+            self.entities.push(Entity::new(self.player_x, self.player_y, 5, EntityType::Projectile(self.dir_x * 8.0, self.dir_y * 8.0)));
+        }
+
+        for projectile in self.entities.iter_mut().filter(|e| matches!(e.entity_type, EntityType::Projectile(..))) {
+            if let EntityType::Projectile(x_vel, y_vel) = projectile.entity_type {
+                projectile.x_pos += x_vel * delta;
+                projectile.y_pos += y_vel * delta;
+            }
+        }
+
+        for i in (0..self.entities.len()).rev() {
+            let entity = &self.entities[i];
+
+            if entity.x_pos < 0.0 || entity.x_pos >= WIDTH as f32 || entity.y_pos < 0.0 || entity.y_pos >= HEIGHT as f32 || self.walls[entity.y_pos as usize][entity.x_pos as usize] != 0 {
+                self.entities.remove(i);
+            }
+        }
     }
 
     fn render(&self) -> Result<()> {
@@ -274,14 +324,17 @@ impl App {
                         hit = 1;
                     }
                 }
+                // correct fish-eye effect
+                let perp_wall_dist = if side == 0 {
+                    side_dist_x - delta_dist_x
+                } else {
+                    side_dist_y - delta_dist_y
+                };
 
                 Ray {
                     ray_dir_x,
                     ray_dir_y,
-                    side_dist_x,
-                    side_dist_y,
-                    delta_dist_x,
-                    delta_dist_y,
+                    ray_dist: perp_wall_dist,
                     map_x,
                     map_y,
                     side,
@@ -366,10 +419,7 @@ impl App {
         for (x, ray) in z_buffer.iter().enumerate() {
             let ray_dir_x = ray.ray_dir_x;
             let ray_dir_y = ray.ray_dir_y;
-            let side_dist_x = ray.side_dist_x;
-            let side_dist_y = ray.side_dist_y;
-            let delta_dist_x = ray.delta_dist_x;
-            let delta_dist_y = ray.delta_dist_y;
+            let perp_wall_dist = ray.ray_dist;
             let map_x = ray.map_x;
             let map_y = ray.map_y;
             let side = ray.side;
@@ -382,12 +432,6 @@ impl App {
                 - 1;
             let texture = &self.textures[texture_id];
 
-            // correct fish-eye effect
-            let perp_wall_dist = if side == 0 {
-                side_dist_x - delta_dist_x
-            } else {
-                side_dist_y - delta_dist_y
-            };
 
             // used to index into wall texture
             let mut wall_x = if side == 0 {
@@ -406,10 +450,10 @@ impl App {
             // ceiling the line height mostly removes an issue where there
             // will be a pixel of the floor/roof at the edges of the wall
             let line_height = (HEIGHT as f32 / perp_wall_dist).ceil() as i32;
-            let top = HEIGHT / 2 - (line_height / 2);
+            let top = ((HEIGHT - line_height) as f32 / 2.0).ceil() as i32;
             let color = if side == 0 { 0x99 } else { 0xff } as f32;
-            let shade = 255.0 * (line_height as f32 / HEIGHT as f32);
-            let color = (color * shade / 255.0).clamp(0.0, 255.0) as u8;
+            let shade = 1.0 / perp_wall_dist;
+            let color = (color * shade).clamp(0.0, 255.0) as u8;
 
             let sub_image = Rect {
                 x: tex_x,
@@ -426,6 +470,58 @@ impl App {
                 PhysicalSize::new(1, line_height as u32),
                 sub_image,
             );
+        }
+
+        let distance = self.entities.iter().map(|e| (self.player_x - e.x_pos).powi(2) + (self.player_y - e.y_pos).powi(2));
+        let mut distance = (0..self.entities.len()).zip(distance).collect::<Vec<(usize, f32)>>();
+
+        // sort farthest entity first
+        distance.sort_by(|(_, a), (_ ,b)| b.total_cmp(a));
+        for index in distance.iter().map(|(i, _)| *i) {
+            let sprite_x = self.entities[index].x_pos - self.player_x;
+            let sprite_y = self.entities[index].y_pos - self.player_y;
+
+            let inv_det = 1.0 / (self.plane_x * self.dir_y - self.dir_x * self.plane_y);
+
+            let transform_x = inv_det * (self.dir_y * sprite_x - self.dir_x * sprite_y);
+            let transform_y = inv_det * (-self.plane_y * sprite_x + self.plane_x * sprite_y);
+
+            let sprite_screen_x = ((WIDTH/2) as f32 * (1.0 + transform_x / transform_y)) as i32;
+
+            let sprite_width = ((HEIGHT as f32/ transform_y) as i32).abs();
+            let sprite_height = ((HEIGHT as f32 / transform_y) as i32).abs();
+
+            let draw_start_y = -sprite_height / 2 + HEIGHT / 2;
+
+            let draw_start_x = -sprite_width / 2 + sprite_screen_x;
+            let draw_end_x = sprite_width / 2 + sprite_screen_x;
+
+            let texture = &self.textures[self.entities[index].texture_id];
+
+            let shade = (1.0 / transform_y).clamp(0.0, 1.0);
+            let color = [
+                (255.0 * shade) as u8,
+                (255.0 * shade) as u8,
+                (255.0 * shade) as u8,
+                (255.0 * shade) as u8,
+            ];
+
+            for stripe in draw_start_x..draw_end_x {
+                let tex_x = ((256 * (stripe - (-sprite_width / 2 + sprite_screen_x)) * texture.width() as i32 / sprite_width) / 256).clamp(0, texture.width() as i32 - 1);
+
+                let stripe = WIDTH - stripe;
+
+                if transform_y > 0.0 && stripe > 0 && stripe < WIDTH && transform_y < z_buffer[stripe as usize].ray_dist {
+                    let strip = Rect {
+                        x: tex_x as u32,
+                        y: 0,
+                        width: 1,
+                        height: texture.height(),
+                    };
+
+                    self.renderer.draw_sub_texture(texture, &color, stripe, draw_start_y, PhysicalSize::new(1, sprite_height as u32), strip);
+                }
+            }
         }
     }
 }
