@@ -196,7 +196,7 @@ impl Renderer {
 
     /// draws a colored pixel at the given x,y coordinates
     pub fn draw_pixel(&mut self, color: &[u8; 4], x: i32, y: i32) {
-        if x < 0 || x > self.width || y < 0 || y >= self.height {
+        if x < 0 || x >= self.width || y < 0 || y >= self.height {
             return;
         }
 
