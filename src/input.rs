@@ -88,7 +88,7 @@ impl InputManager {
                 let state = *state == ElementState::Pressed;
                 match button {
                     MouseButton::Left => self.mouse_buttons[0] = state,
-                    MouseButton::Right => self.mouse_buttons[0] = state,
+                    MouseButton::Right => self.mouse_buttons[1] = state,
                     _ => ()
                 }
                 false
