@@ -310,53 +310,56 @@ impl App {
                 let cell_x = floor_x as i32;
                 let cell_y = floor_y as i32;
 
-                let floor_texture_id = (self
+                if let Some(Some(&id)) = self
                     .floor
                     .get(cell_y as usize)
-                    .map(|row| *row.get(cell_x as usize).unwrap_or(&1))
-                    .map(|id| if id == 0 { 1 } else { id })
-                    .unwrap_or(1)
-                    - 1) as usize;
-                let floor_texture = &self.textures[floor_texture_id];
+                    .map(|row| row.get(cell_x as usize))
+                {
+                    if id > 0 {
+                        let floor_texture = &self.textures[id as usize - 1];
+                        let floor_tx = (floor_texture.width() as f32 * (floor_x - cell_x as f32))
+                            as u32
+                            & (floor_texture.width() - 1);
+                        let floor_ty = (floor_texture.height() as f32 * (floor_y - cell_y as f32))
+                            as u32
+                            & (floor_texture.height() - 1);
 
-                let ceil_texture_id = (self
+                        let floor_color = floor_texture.get_pixel(floor_tx, floor_ty);
+                        let floor_color = [
+                            (floor_color[0] as f32 * shade).clamp(0.0, 255.0) as u8,
+                            (floor_color[1] as f32 * shade).clamp(0.0, 255.0) as u8,
+                            (floor_color[2] as f32 * shade).clamp(0.0, 255.0) as u8,
+                            (floor_color[3] as f32 * shade).clamp(0.0, 255.0) as u8,
+                        ];
+                        self.renderer.draw_pixel(&floor_color, x, y);
+                    }
+                }
+
+                if let Some(Some(&id)) = self
                     .ceiling
                     .get(cell_y as usize)
-                    .map(|row| *row.get(cell_x as usize).unwrap_or(&1))
-                    .map(|id| if id == 0 { 1 } else { id })
-                    .unwrap_or(1)
-                    - 1) as usize;
-                let ceil_texture = &self.textures[ceil_texture_id];
+                    .map(|row| row.get(cell_x as usize))
+                {
+                    if id > 0 {
+                        let ceil_texture = &self.textures[id as usize - 1];
+                        let ceil_tx = (ceil_texture.width() as f32 * (floor_x - cell_x as f32)) as u32
+                            & (ceil_texture.width() - 1);
+                        let ceil_ty = (ceil_texture.height() as f32 * (floor_y - cell_y as f32)) as u32
+                            & (ceil_texture.height() - 1);
 
-                let floor_tx = (floor_texture.width() as f32 * (floor_x - cell_x as f32)) as u32
-                    & (floor_texture.width() - 1);
-                let floor_ty = (floor_texture.height() as f32 * (floor_y - cell_y as f32)) as u32
-                    & (floor_texture.height() - 1);
-                let ceil_tx = (floor_texture.width() as f32 * (floor_x - cell_x as f32)) as u32
-                    & (floor_texture.width() - 1);
-                let ceil_ty = (ceil_texture.height() as f32 * (floor_y - cell_y as f32)) as u32
-                    & (ceil_texture.height() - 1);
+                        let ceil_color = ceil_texture.get_pixel(ceil_tx, ceil_ty);
+                        let ceil_color = [
+                            (ceil_color[0] as f32 * shade).clamp(0.0, 255.0) as u8,
+                            (ceil_color[1] as f32 * shade).clamp(0.0, 255.0) as u8,
+                            (ceil_color[2] as f32 * shade).clamp(0.0, 255.0) as u8,
+                            (ceil_color[3] as f32 * shade).clamp(0.0, 255.0) as u8,
+                        ];
+                        self.renderer.draw_pixel(&ceil_color, x, HEIGHT - y);
+                    }
+                }
 
                 floor_x += floor_step_x;
                 floor_y += floor_step_y;
-
-                let floor_color = floor_texture.get_pixel(floor_tx, floor_ty);
-                let floor_color = [
-                    (floor_color[0] as f32 * shade).clamp(0.0, 255.0) as u8,
-                    (floor_color[1] as f32 * shade).clamp(0.0, 255.0) as u8,
-                    (floor_color[2] as f32 * shade).clamp(0.0, 255.0) as u8,
-                    (floor_color[3] as f32 * shade).clamp(0.0, 255.0) as u8,
-                ];
-                self.renderer.draw_pixel(&floor_color, x, y);
-
-                let ceil_color = ceil_texture.get_pixel(ceil_tx, ceil_ty);
-                let ceil_color = [
-                    (ceil_color[0] as f32 * shade).clamp(0.0, 255.0) as u8,
-                    (ceil_color[1] as f32 * shade).clamp(0.0, 255.0) as u8,
-                    (ceil_color[2] as f32 * shade).clamp(0.0, 255.0) as u8,
-                    (ceil_color[3] as f32 * shade).clamp(0.0, 255.0) as u8,
-                ];
-                self.renderer.draw_pixel(&ceil_color, x, HEIGHT - y);
             }
         }
 
