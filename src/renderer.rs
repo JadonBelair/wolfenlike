@@ -295,13 +295,15 @@ impl Renderer {
 
                 let pix = subimage
                     .get_pixel((c_x as f32 * x_scale) as u32, (c_y as f32 * y_scale) as u32);
-                let color = [
-                    (pix[0] as f32 * (color[0] as f32 / 255.0)) as u8,
-                    (pix[1] as f32 * (color[1] as f32 / 255.0)) as u8,
-                    (pix[2] as f32 * (color[2] as f32 / 255.0)) as u8,
-                    (pix[3] as f32 * (color[3] as f32 / 255.0)) as u8,
-                ];
-                self.draw_pixel(&color, offset_x, offset_y);
+                if pix[3] != 0 {
+                    let color = [
+                        (pix[0] as f32 * (color[0] as f32 / 255.0)) as u8,
+                        (pix[1] as f32 * (color[1] as f32 / 255.0)) as u8,
+                        (pix[2] as f32 * (color[2] as f32 / 255.0)) as u8,
+                        (pix[3] as f32 * (color[3] as f32 / 255.0)) as u8,
+                    ];
+                    self.draw_pixel(&color, offset_x, offset_y);
+                }
             }
         }
     }
