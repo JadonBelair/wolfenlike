@@ -1,6 +1,6 @@
 use anyhow::Result;
 use image::math::Rect;
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView};
 use rayon::iter::IntoParallelIterator;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{Event, VirtualKeyCode};
@@ -134,7 +134,7 @@ impl App {
 
         let turn_speed = {
             let (motion_x, _) = self.input_manager.mouse_motion();
-            -motion_x as f32 * delta * 2.0
+            motion_x as f32 * delta * 2.0
         };
         let old_dir_x = self.dir_x;
         self.dir_x = self.dir_x * (turn_speed).cos() - self.dir_y * (turn_speed).sin();
@@ -156,11 +156,11 @@ impl App {
             move_x -= self.dir_x;
             move_y -= self.dir_y;
         }
-        if self.input_manager.is_down(VirtualKeyCode::A) {
+        if self.input_manager.is_down(VirtualKeyCode::D) {
             move_y += self.dir_x;
             move_x -= self.dir_y;
         }
-        if self.input_manager.is_down(VirtualKeyCode::D) {
+        if self.input_manager.is_down(VirtualKeyCode::A) {
             move_y -= self.dir_x;
             move_x += self.dir_y;
         }
@@ -193,8 +193,8 @@ impl App {
             .into_par_iter()
             .map(|x| {
                 let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
-                let ray_dir_x = self.dir_x + self.plane_x * camera_x;
-                let ray_dir_y = self.dir_y + self.plane_y * camera_x;
+                let ray_dir_x = self.dir_x + self.plane_x * -camera_x;
+                let ray_dir_y = self.dir_y + self.plane_y * -camera_x;
                 let mut map_x = self.player_x as i32;
                 let mut map_y = self.player_y as i32;
 
@@ -249,6 +249,49 @@ impl App {
             })
             .collect::<Vec<Ray>>();
 
+        for y in (HEIGHT/2)..HEIGHT {
+            let ray_dir_x0 = self.dir_x + self.plane_x;
+            let ray_dir_y0 = self.dir_y + self.plane_y;
+            let ray_dir_x1 = self.dir_x - self.plane_x;
+            let ray_dir_y1 = self.dir_y - self.plane_y;
+
+            let p = y - HEIGHT / 2;
+            let pos_z = if p != 0 {
+                0.5 * HEIGHT as f32
+            } else {
+                1e30
+            };
+
+            let row_dist = pos_z / p as f32;
+
+            let floor_step_x = row_dist * (ray_dir_x1 - ray_dir_x0) / WIDTH as f32;
+            let floor_step_y = row_dist * (ray_dir_y1 - ray_dir_y0) / WIDTH as f32;
+
+            let mut floor_x = self.player_x + row_dist * ray_dir_x0;
+            let mut floor_y = self.player_y + row_dist * ray_dir_y0;
+
+            for x in 0..WIDTH {
+                let cell_x = floor_x as i32;
+                let cell_y = floor_y as i32;
+
+                let tx = (bricks.width() as f32 * (floor_x - cell_x as f32)) as u32 & (bricks.width() - 1);
+                let ty = (bricks.height() as f32 * (floor_y - cell_y as f32)) as u32 & (bricks.height() - 1);
+
+                floor_x += floor_step_x;
+                floor_y += floor_step_y;
+                let color = bricks.get_pixel(tx, ty);
+                let color = [
+                    color[0] - (color[0] as f32 * (row_dist / 12 as f32)).clamp(0.0, 255.0) as u8,
+                    color[1] - (color[1] as f32 * (row_dist / 12 as f32)).clamp(0.0, 255.0) as u8,
+                    color[2] - (color[2] as f32 * (row_dist / 12 as f32)).clamp(0.0, 255.0) as u8,
+                    color[3] - (color[3] as f32 * (row_dist / 12 as f32)).clamp(0.0, 255.0) as u8,
+                ];
+
+                self.renderer.draw_pixel(&color, x, y);
+                self.renderer.draw_pixel(&color, x, HEIGHT - y);
+            }
+        }
+
         for (x, ray) in z_buffer.iter().enumerate() {
             let ray_dir_x = ray.ray_dir_x;
             let ray_dir_y = ray.ray_dir_y;
@@ -298,15 +341,6 @@ impl App {
                 top,
                 PhysicalSize::new(1, line_height as u32),
                 sub_image,
-            );
-
-            self.renderer
-                .draw_vert_line(&[0x00, 0xff, 0xff, 0xff], x as i32, 0, top);
-            self.renderer.draw_vert_line(
-                &[0xff, 0x00, 0x00, 0xff],
-                x as i32,
-                top + line_height,
-                HEIGHT - (top + line_height),
             );
         }
     }
