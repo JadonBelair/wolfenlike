@@ -257,19 +257,13 @@ impl App {
             ));
         }
 
-        for projectile in self
-            .entities
-            .iter_mut()
-            .filter(|e| matches!(e.entity_type, EntityType::Projectile(..)))
-        {
-            if let EntityType::Projectile(x_vel, y_vel) = projectile.entity_type {
-                projectile.x_pos += x_vel * delta;
-                projectile.y_pos += y_vel * delta;
-            }
-        }
-
         for i in (0..self.entities.len()).rev() {
-            let entity = &self.entities[i];
+            let entity = &mut self.entities[i];
+
+            if let EntityType::Projectile(x_vel, y_vel) = entity.entity_type {
+                entity.x_pos += x_vel * delta;
+                entity.y_pos += y_vel * delta;
+            }
 
             if entity.x_pos < 0.0
                 || entity.x_pos >= WIDTH as f32
@@ -531,34 +525,39 @@ impl App {
                 (255.0 * shade) as u8,
             ];
 
-            // TODO: figure out how to draw whole texture with 1 draw_sub_texture call
-
-            // filter out any columns that are hidden behind a wall
-            for stripe in ((draw_start_x.clamp(0, WIDTH - 1))..(draw_end_x.clamp(0, WIDTH - 1)))
-                .filter(|x| z_buffer[WIDTH as usize - *x as usize - 1].ray_dist > transform_y)
-            {
+            let stripes = ((draw_start_x.clamp(0, WIDTH - 1))..(draw_end_x.clamp(0, WIDTH - 1)))
+                .filter(|x| z_buffer[WIDTH as usize - *x as usize - 1].ray_dist >= transform_y)
+                .collect::<Vec<i32>>();
+            if !stripes.is_empty() {
                 let tex_x = ((256
-                    * (stripe - (-sprite_width / 2 + sprite_screen_x))
+                    * (stripes.last().unwrap() - (-sprite_width / 2 + sprite_screen_x))
                     * texture.width() as i32
                     / sprite_width)
                     / 256)
                     .clamp(0, texture.width() as i32 - 1);
 
-                let stripe = WIDTH - stripe;
+                let end_tex_x = ((256
+                    * (stripes[0] - (-sprite_width / 2 + sprite_screen_x))
+                    * texture.width() as i32
+                    / sprite_width)
+                    / 256)
+                    .clamp(0, texture.width() as i32 - 1);
 
                 let strip = Rect {
-                    x: tex_x as u32,
+                    x: texture.width() - 1 - tex_x as u32,
                     y: 0,
-                    width: 1,
+                    width: (tex_x - end_tex_x) as u32,
                     height: texture.height(),
                 };
 
                 self.renderer.draw_sub_texture(
                     texture,
                     &color,
-                    stripe,
+                    // why is there a gap without -2?
+                    WIDTH - stripes.last().unwrap() - 2,
                     draw_start_y,
-                    PhysicalSize::new(1, sprite_height as u32),
+                    // why do i need to add +1 here?
+                    PhysicalSize::new(stripes.len() as u32 + 1, sprite_height as u32),
                     strip,
                 );
             }
