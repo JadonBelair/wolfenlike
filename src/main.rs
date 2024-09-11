@@ -155,16 +155,16 @@ impl App {
                 vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             ],
             floor: vec![
-                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
-                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
-                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
-                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
-                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
-                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
-                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
-                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
-                vec![3, 2, 3, 2, 3, 2, 3, 2, 3, 2],
-                vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             ],
             ceiling: vec![
                 vec![2, 3, 2, 3, 2, 3, 2, 3, 2, 3],
@@ -371,7 +371,8 @@ impl App {
             let mut floor_x = self.player_x + row_dist * ray_dir_x0;
             let mut floor_y = self.player_y + row_dist * ray_dir_y0;
 
-            let shade = ((y - (HEIGHT >> 1)) << 1) as f32 / HEIGHT as f32;
+            let line_height = (y - (HEIGHT >> 1)) << 1;
+            let shade = line_height as f32 / HEIGHT as f32;
 
             for x in 0..WIDTH {
                 let cell_x = floor_x as i32;
@@ -467,7 +468,7 @@ impl App {
             let line_height = (HEIGHT as f32 / perp_wall_dist).ceil() as i32;
             let top = ((HEIGHT - line_height) as f32 / 2.0).ceil() as i32;
             let color = if side == 0 { 0x99 } else { 0xff } as f32;
-            let shade = 1.0 / perp_wall_dist;
+            let shade = line_height as f32 / HEIGHT as f32;
             let color = (color * shade).clamp(0.0, 255.0) as u8;
 
             let sub_image = Rect {
@@ -505,6 +506,10 @@ impl App {
 
             let transform_x = inv_det * (self.dir_y * sprite_x - self.dir_x * sprite_y);
             let transform_y = inv_det * (-self.plane_y * sprite_x + self.plane_x * sprite_y);
+            // dont draw entities behind the camera
+            if transform_y < 0.0 {
+                continue;
+            }
 
             let sprite_screen_x = ((WIDTH / 2) as f32 * (1.0 + transform_x / transform_y)) as i32;
 
@@ -518,7 +523,7 @@ impl App {
 
             let texture = &self.textures[self.entities[index].texture_id];
 
-            let shade = (1.0 / transform_y).clamp(0.0, 1.0);
+            let shade = (sprite_height as f32 / HEIGHT as f32).clamp(0.0, 1.0);
             let color = [
                 (255.0 * shade) as u8,
                 (255.0 * shade) as u8,
@@ -526,7 +531,12 @@ impl App {
                 (255.0 * shade) as u8,
             ];
 
-            for stripe in draw_start_x..draw_end_x {
+            // TODO: figure out how to draw whole texture with 1 draw_sub_texture call
+
+            // filter out any columns that are hidden behind a wall
+            for stripe in ((draw_start_x.clamp(0, WIDTH - 1))..(draw_end_x.clamp(0, WIDTH - 1)))
+                .filter(|x| z_buffer[WIDTH as usize - *x as usize - 1].ray_dist > transform_y)
+            {
                 let tex_x = ((256
                     * (stripe - (-sprite_width / 2 + sprite_screen_x))
                     * texture.width() as i32
@@ -536,27 +546,21 @@ impl App {
 
                 let stripe = WIDTH - stripe;
 
-                if transform_y > 0.0
-                    && stripe > 0
-                    && stripe < WIDTH
-                    && transform_y < z_buffer[stripe as usize].ray_dist
-                {
-                    let strip = Rect {
-                        x: tex_x as u32,
-                        y: 0,
-                        width: 1,
-                        height: texture.height(),
-                    };
+                let strip = Rect {
+                    x: tex_x as u32,
+                    y: 0,
+                    width: 1,
+                    height: texture.height(),
+                };
 
-                    self.renderer.draw_sub_texture(
-                        texture,
-                        &color,
-                        stripe,
-                        draw_start_y,
-                        PhysicalSize::new(1, sprite_height as u32),
-                        strip,
-                    );
-                }
+                self.renderer.draw_sub_texture(
+                    texture,
+                    &color,
+                    stripe,
+                    draw_start_y,
+                    PhysicalSize::new(1, sprite_height as u32),
+                    strip,
+                );
             }
         }
     }
