@@ -12,7 +12,7 @@ use input::InputManager;
 use renderer::Renderer;
 
 const SCALE: i32 = 4;
-const WIDTH: i32 = 180 * SCALE;
+const WIDTH: i32 = 240 * SCALE;
 const HEIGHT: i32 = 135 * SCALE;
 
 mod input;
@@ -138,7 +138,7 @@ impl App {
             dir_x: -1.0,
             dir_y: 0.0,
             plane_x: 0.0,
-            plane_y: 0.66,
+            plane_y: WIDTH as f32 / HEIGHT as f32 / 2.0,
             textures: Vec::new(),
             renderer,
             input_manager,
