@@ -525,19 +525,14 @@ impl App {
                 (255.0 * shade) as u8,
             ];
 
-            let stripes = ((draw_start_x.clamp(0, WIDTH - 1))..(draw_end_x.clamp(0, WIDTH - 1)))
+            // projectiles sometimes look strange with this method
+            let mut stripes = ((draw_start_x.clamp(0, WIDTH - 1))..=(draw_end_x.clamp(0, WIDTH - 1)))
                 .filter(|x| z_buffer[WIDTH as usize - *x as usize - 1].ray_dist >= transform_y)
                 .collect::<Vec<i32>>();
+            stripes.dedup();
             if !stripes.is_empty() {
                 let tex_x = ((256
-                    * (stripes.last().unwrap() - (-sprite_width / 2 + sprite_screen_x))
-                    * texture.width() as i32
-                    / sprite_width)
-                    / 256)
-                    .clamp(0, texture.width() as i32 - 1);
-
-                let end_tex_x = ((256
-                    * (stripes[0] - (-sprite_width / 2 + sprite_screen_x))
+                    * (stripes.last().unwrap() - draw_start_x)
                     * texture.width() as i32
                     / sprite_width)
                     / 256)
@@ -546,18 +541,16 @@ impl App {
                 let strip = Rect {
                     x: texture.width() - 1 - tex_x as u32,
                     y: 0,
-                    width: (tex_x - end_tex_x) as u32,
+                    width: texture.width() * stripes.len() as u32 / sprite_width as u32,
                     height: texture.height(),
                 };
 
                 self.renderer.draw_sub_texture(
                     texture,
                     &color,
-                    // why is there a gap without -2?
-                    WIDTH - stripes.last().unwrap() - 2,
+                    WIDTH - stripes.last().unwrap() - 1,
                     draw_start_y,
-                    // why do i need to add +1 here?
-                    PhysicalSize::new(stripes.len() as u32 + 1, sprite_height as u32),
+                    PhysicalSize::new(stripes.len() as u32, sprite_height as u32),
                     strip,
                 );
             }
