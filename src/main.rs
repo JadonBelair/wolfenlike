@@ -18,7 +18,6 @@ const HEIGHT: i32 = 135 * SCALE;
 mod input;
 mod renderer;
 
-/// Representation of the application state. In this example, a box will bounce around the screen.
 struct App {
     renderer: Renderer,
     input_manager: InputManager,
@@ -193,7 +192,7 @@ impl App {
         self.textures.len() - 1
     }
 
-    /// Update the `World` internal state; bounce the box around the screen.
+    /// Update the `World` internal state; move player and projectiles
     fn update(&mut self) {
         if let Some(size) = self.input_manager.request_resize {
             self.renderer.resize(size);
@@ -525,11 +524,12 @@ impl App {
                 (255.0 * shade) as u8,
             ];
 
-            // projectiles sometimes look strange with this method
-            let mut stripes = ((draw_start_x.clamp(0, WIDTH - 1))..=(draw_end_x.clamp(0, WIDTH - 1)))
-                .filter(|x| z_buffer[WIDTH as usize - *x as usize - 1].ray_dist >= transform_y)
+            // gets every stripe that is on the screen and infront of the wall.
+            // this method is faster than drawing each stripe indivisually 
+            // but does not work on sprites that are bigger than the walls.
+            let stripes = (draw_start_x..=draw_end_x)
+                .filter(|x| *x >= 0 && *x < WIDTH && z_buffer[WIDTH as usize - *x as usize - 1].ray_dist >= transform_y)
                 .collect::<Vec<i32>>();
-            stripes.dedup();
             if !stripes.is_empty() {
                 let tex_x = ((256
                     * (stripes.last().unwrap() - draw_start_x)
